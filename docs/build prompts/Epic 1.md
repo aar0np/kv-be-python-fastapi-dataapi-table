@@ -148,7 +148,7 @@ Each prompt will assume the LLM has context of the previous prompts and the over
 Objective: Initialize the KillrVideo Python backend project using Poetry and set up a basic FastAPI application with a health check endpoint and initial configuration.
 
 Specifications:
-1.  Create a new Python project named `killrvideo-python-backend` using `poetry init`.
+1.  Create a new Python project named `killrvideo-python-fastapi-backend` using `poetry init`.
     *   Python version: `^3.10`
     *   Add basic metadata (description, author - you can use placeholders).
 2.  Add the following production dependencies using `poetry add`:
@@ -179,7 +179,7 @@ Specifications:
     *   Add `__init__.py` files to all new Python package directories (`app`, `app/core`, `app/models`, `app/api`, `app/api/v1`, `app/api/v1/endpoints`, `tests`, etc.) to make them importable.
 5.  In `app/core/config.py`:
     *   Create a `Settings` class inheriting from `pydantic_settings.BaseSettings`.
-    *   Add initial settings: `PROJECT_NAME: str = "KillrVideo 2025 Python Backend"` and `API_V1_STR: str = "/api/v1"`.
+    *   Add initial settings: `PROJECT_NAME: str = "KillrVideo Python FastAPI Backend"` and `API_V1_STR: str = "/api/v1"`.
     *   Configure it to load from a `.env` file (using `class Config: env_file = ".env"`).
     *   Instantiate `settings = Settings()`.
 6.  Create a `.env.example` file in the project root with placeholders for future environment variables (for now, it can be empty or just have `PROJECT_NAME` if you want to test overriding it). Add `.env` to `.gitignore`.

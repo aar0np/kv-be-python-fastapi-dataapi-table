@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "killrvideo-python-fastapi-backend"
+version = "0.1.0"
+description = "KillrVideo Python FastAPI Backend"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.115.12"
+uvicorn = {extras = ["standard"], version = "^0.34.2"}
+pydantic-settings = "^2.9.1"
+python-jose = {extras = ["cryptography"], version = "^3.5.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+astrapy = "^2.0.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+pytest-asyncio = "^1.0.0"
+httpx = "^0.28.1"
+mypy = "^1.16.0"
+ruff = "^0.11.12"
+email-validator = "^2.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

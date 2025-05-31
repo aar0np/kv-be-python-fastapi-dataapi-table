@@ -1,0 +1,67 @@
+{
+  "include": [
+    "app/**/*.py",
+    "tests/**/*.py",
+    "services_dockerfiles/*.Dockerfile",
+    "pyproject.toml",
+    "poetry.lock",
+    ".env.example",
+    "README.md",
+    "KillrVideo 2025 API Specification.md",
+    "KillrVideo 2025 Functional Specification.md"
+  ],
+  "exclude": [
+    ".venv/",
+    "venv/",
+    "env/",
+    "**/__pycache__/",
+    "*.pyc",
+    "dist/",
+    "build/",
+    "*.egg-info/",
+    ".pytest_cache/",
+    ".coverage",
+    "htmlcov/",
+    ".mypy_cache/",
+    ".ruff_cache/",
+    ".vscode/",
+    ".idea/",
+    ".DS_Store",
+    ".git/",
+    "*.log",
+    "logs/",
+    ".env",
+    ".cursorrules.json"
+  ],
+  "docs": [
+    "KillrVideo 2025 API Specification.md",
+    "KillrVideo 2025 Functional Specification.md",
+    "README.md"
+  ],
+  "behavioral_rules": [
+    {
+      "description": "All new API endpoint functions in FastAPI routers should have clear Pydantic models for request and response validation, and use FastAPI's dependency injection for auth and common parameters.",
+      "scope": "app/api/v1/endpoints/**/*.py"
+    },
+    {
+      "description": "Service layer methods should encapsulate business logic and database interactions, keeping endpoint handlers lean. They should expect Pydantic models for input where applicable and return Pydantic models or basic Python types/dicts.",
+      "scope": "app/services/**/*.py"
+    },
+    {
+      "description": "All new public methods and functions should include Python type hints and a concise docstring explaining their purpose, arguments, and what they return.",
+      "scope": "app/**/*.py"
+    },
+    {
+      "description": "Database interactions should go through methods in the `app.db.astra_client` module or abstracted by service layer methods, rather than direct `AstraDB` calls in endpoint handlers.",
+      "scope": "app/**/*.py"
+    },
+    {
+      "description": "When adding new dependencies, ensure they are added via Poetry and that `pyproject.toml` and `poetry.lock` are updated.",
+      "scope": "pyproject.toml"
+    },
+    {
+        "description": "Tests should be written for new functionalities, primarily unit tests for services and integration tests for API endpoints. Mock external dependencies and database calls in unit tests.",
+        "scope": "tests/**/*.py"
+    }
+  ]
+}

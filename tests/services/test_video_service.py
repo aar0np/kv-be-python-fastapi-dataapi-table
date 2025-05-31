@@ -1,0 +1,306 @@
+import pytest
+from unittest.mock import AsyncMock, patch, MagicMock
+from uuid import uuid4
+from datetime import datetime, timezone
+
+from app.services import video_service
+from app.models.video import VideoSubmitRequest, VideoStatusEnum, Video, VideoUpdateRequest
+from app.models.user import User
+
+
+# ------------------------------------------------------------
+# Fixtures
+# ------------------------------------------------------------
+
+
+@pytest.fixture
+def test_user() -> User:
+    """Return a minimal User object with a *creator* role for tests."""
+
+    return User(
+        userId=uuid4(),
+        firstName="Unit",
+        lastName="Tester",
+        email="unittest@example.com",
+        roles=["creator"],
+    )
+
+
+# ------------------------------------------------------------
+# extract_youtube_video_id
+# ------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        ("https://youtu.be/abcdefghijk", "abcdefghijk"),
+        ("http://youtu.be/abcdefghijk", "abcdefghijk"),
+        ("https://www.youtube.com/watch?v=abcdefghijk", "abcdefghijk"),
+        ("https://youtube.com/watch?v=abcdefghijk", "abcdefghijk"),
+        ("https://www.youtube.com/embed/abcdefghijk", "abcdefghijk"),
+        ("https://www.youtube.com/v/abcdefghijk", "abcdefghijk"),
+        ("https://www.youtube.com/shorts/abcdefghijk", "abcdefghijk"),
+    ],
+)
+def test_extract_youtube_video_id_valid(url: str, expected: str):
+    assert video_service.extract_youtube_video_id(url) == expected
+
+
+def test_extract_youtube_video_id_invalid():
+    assert (
+        video_service.extract_youtube_video_id("https://example.com/notyoutube") is None
+    )
+
+
+# ------------------------------------------------------------
+# submit_new_video
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_submit_new_video_success(test_user: User):
+    request = VideoSubmitRequest(youtubeUrl="https://youtu.be/abcdefghijk")
+
+    # Prepare mocks
+    mock_db_table = AsyncMock()
+    mock_db_table.insert_one.return_value = MagicMock(inserted_id="someid")
+
+    # Patch uuid4 to deterministic value for assertion
+    deterministic_video_id = uuid4()
+    with patch("app.services.video_service.uuid4", return_value=deterministic_video_id):
+        new_video = await video_service.submit_new_video(
+            request=request, current_user=test_user, db_table=mock_db_table
+        )
+
+    # Assertions on DB insert
+    mock_db_table.insert_one.assert_called_once()
+    args, kwargs = mock_db_table.insert_one.call_args
+    inserted_doc = kwargs.get("document")
+    assert inserted_doc is not None
+    assert inserted_doc["videoId"] == str(deterministic_video_id)
+    assert inserted_doc["userId"] == str(test_user.userId)
+    assert inserted_doc["youtubeVideoId"] == "abcdefghijk"
+    assert inserted_doc["status"] == video_service.VideoStatusEnum.PENDING
+
+    # Assertions on returned model
+    assert isinstance(new_video, Video)
+    assert new_video.videoId == deterministic_video_id
+    assert new_video.userId == test_user.userId
+    assert new_video.youtubeVideoId == "abcdefghijk"
+    assert new_video.status == VideoStatusEnum.PENDING
+
+
+@pytest.mark.asyncio
+async def test_submit_new_video_invalid_url(test_user: User):
+    request = VideoSubmitRequest(youtubeUrl="https://example.com/notyoutube")
+    mock_db_table = AsyncMock()
+
+    with pytest.raises(video_service.HTTPException) as exc_info:
+        await video_service.submit_new_video(
+            request=request, current_user=test_user, db_table=mock_db_table
+        )
+
+    assert exc_info.value.status_code == 400
+    mock_db_table.insert_one.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_submit_new_video_uses_get_table_when_none(test_user: User):
+    request = VideoSubmitRequest(youtubeUrl="https://youtu.be/abcdefghijk")
+
+    with patch("app.services.video_service.get_table", new_callable=AsyncMock) as mock_get_table:
+        mock_actual_table = AsyncMock()
+        mock_actual_table.insert_one.return_value = MagicMock(inserted_id="someid")
+        mock_get_table.return_value = mock_actual_table
+
+        await video_service.submit_new_video(request=request, current_user=test_user)
+
+        mock_get_table.assert_called_once_with(video_service.VIDEOS_TABLE_NAME)
+        mock_actual_table.insert_one.assert_called_once()
+
+
+# ------------------------------------------------------------
+# get_video_by_id
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_video_by_id_found(test_user: User):
+    target_video = _build_video()
+
+    mock_db_table = AsyncMock()
+    mock_db_table.find_one.return_value = video_service._video_to_document(target_video)
+
+    result = await video_service.get_video_by_id(
+        video_id=target_video.videoId, db_table=mock_db_table
+    )
+
+    mock_db_table.find_one.assert_called_once_with(filter={"videoId": str(target_video.videoId)})
+    assert result == target_video
+
+
+@pytest.mark.asyncio
+async def test_get_video_by_id_not_found():
+    mock_db_table = AsyncMock()
+    mock_db_table.find_one.return_value = None
+
+    result = await video_service.get_video_by_id(video_id=uuid4(), db_table=mock_db_table)
+    assert result is None
+
+
+# helper function for building video inside tests
+
+
+def _build_video():
+    return Video(
+        videoId=uuid4(),
+        userId=uuid4(),
+        youtubeVideoId="abcdefghijk",
+        submittedAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
+        status=VideoStatusEnum.PENDING,
+        title="Title",
+        description=None,
+        tags=[],
+        thumbnailUrl=None,
+        viewCount=0,
+        averageRating=None,
+    )
+
+
+# ------------------------------------------------------------
+# update_video_details
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_video_details_success():
+    original_video = _build_video()
+    update_req = VideoUpdateRequest(title="New Title", description="New desc")
+
+    mock_db_table = AsyncMock()
+    mock_db_table.update_one.return_value = AsyncMock()
+
+    result = await video_service.update_video_details(
+        video_to_update=original_video,
+        update_request=update_req,
+        db_table=mock_db_table,
+    )
+
+    mock_db_table.update_one.assert_called_once()
+    assert result.title == "New Title"
+    assert result.description == "New desc"
+    assert result.updatedAt > original_video.updatedAt
+
+
+@pytest.mark.asyncio
+async def test_update_video_details_no_changes():
+    original_video = _build_video()
+    update_req = VideoUpdateRequest()
+
+    mock_db_table = AsyncMock()
+
+    result = await video_service.update_video_details(
+        video_to_update=original_video,
+        update_request=update_req,
+        db_table=mock_db_table,
+    )
+
+    mock_db_table.update_one.assert_not_called()
+    assert result == original_video
+
+
+# ------------------------------------------------------------
+# record_video_view
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_record_video_view_success():
+    vid = uuid4()
+    mock_db = AsyncMock()
+    mock_db.find_one.return_value = {"videoId": str(vid), "viewCount": 1}
+    mock_db.update_one.return_value = AsyncMock()
+
+    success = await video_service.record_video_view(vid, mock_db)
+    assert success is True
+    mock_db.update_one.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_record_video_view_not_found():
+    mock_db = AsyncMock()
+    mock_db.find_one.return_value = None
+
+    success = await video_service.record_video_view(uuid4(), mock_db)
+    assert success is False
+
+
+# ------------------------------------------------------------
+# list_latest_videos (delegate to generic) – just verify query call
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_list_latest_videos():
+    mock_db = AsyncMock()
+    mock_db.find = MagicMock(return_value=[])
+    mock_db.count_documents.return_value = 0
+
+    summaries, total = await video_service.list_latest_videos(1, 10, mock_db)
+    mock_db.find.assert_called_once()
+    mock_db.count_documents.assert_called_once()
+    assert summaries == []
+    assert total == 0
+
+
+# ------------------------------------------------------------
+# search_videos_by_keyword
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_search_videos_by_keyword():
+    mock_db = AsyncMock()
+    mock_db.find = MagicMock(return_value=[])
+    mock_db.count_documents = AsyncMock(return_value=0)
+
+    summaries, total = await video_service.search_videos_by_keyword(
+        query="test", page=1, page_size=10, db_table=mock_db
+    )
+
+    mock_db.find.assert_called_once()
+    mock_db.count_documents.assert_called_once()
+    assert summaries == []
+    assert total == 0
+
+
+# ------------------------------------------------------------
+# suggest_tags
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_suggest_tags_matching():
+    # Simulate three docs with tags
+    docs = [
+        {"tags": ["python", "fastapi"]},
+        {"tags": ["backend", "python"]},
+        {"tags": ["video", "catalog"]},
+    ]
+
+    mock_db = AsyncMock()
+    mock_db.find.return_value = docs
+
+    suggestions = await video_service.suggest_tags("py", limit=5, db_table=mock_db)
+    assert any(s.tag == "python" for s in suggestions)
+
+
+@pytest.mark.asyncio
+async def test_suggest_tags_no_match():
+    mock_db = AsyncMock()
+    mock_db.find.return_value = []
+
+    suggestions = await video_service.suggest_tags("nomatch", limit=5, db_table=mock_db)
+    assert suggestions == [] 
