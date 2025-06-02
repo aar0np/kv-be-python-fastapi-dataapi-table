@@ -169,3 +169,29 @@ class PaginationParams:
 
 
 common_pagination_params = Annotated[PaginationParams, Depends()]
+
+# Optional auth dependency
+
+
+async def get_current_user_optional(
+    token: Annotated[Optional[str], Depends(reusable_oauth2)],
+) -> Optional[User]:
+    """Return User if valid token provided, otherwise None (no error)."""
+
+    if token is None:
+        return None
+
+    try:
+        payload_dict = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        token_data = TokenPayload(**payload_dict)
+        if token_data.sub is None:
+            return None
+    except (JWTError, ValidationError):
+        return None
+
+    try:
+        user_id = UUID(str(token_data.sub))
+    except ValueError:
+        return None
+
+    return await user_service.get_user_by_id_from_table(user_id=user_id)

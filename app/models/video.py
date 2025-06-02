@@ -62,6 +62,7 @@ class Video(VideoBase):
     thumbnailUrl: Optional[HttpUrl] = None
     viewCount: int = 0
     averageRating: Optional[float] = None
+    totalRatingsCount: int = 0
 
 
 class VideoUpdateRequest(BaseModel):

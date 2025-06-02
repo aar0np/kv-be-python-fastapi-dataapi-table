@@ -23,4 +23,8 @@ __all__ = [
     "VideoRatingRequest",
     "VideoRatingSummary",
     "TagSuggestion",
+    "RatingCreateOrUpdateRequest",
+    "Rating",
+    "RatingResponse",
+    "AggregateRatingResponse",
 ]
