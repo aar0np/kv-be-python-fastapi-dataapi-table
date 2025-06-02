@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Annotated, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status, BackgroundTasks, HTTPException, Response
+from fastapi import APIRouter, Depends, status, BackgroundTasks, HTTPException, Response, Query
 
 from app.models.video import (
     VideoSubmitRequest,
@@ -26,9 +26,10 @@ from app.api.v1.dependencies import (
     get_video_for_owner_or_moderator_access,
     get_current_viewer,
 )
-from app.services import video_service
+from app.services import video_service, recommendation_service
 from app.models.common import PaginatedResponse, Pagination
 from app.api.v1.dependencies import PaginationParams
+from app.models.recommendation import RecommendationItem
 
 router = APIRouter(prefix="/videos", tags=["Videos"])
 
@@ -231,4 +232,25 @@ async def submit_rating(
 )
 async def get_rating_summary_endpoint(video_id_path: VideoID):
     summary = await video_service.get_rating_summary(video_id_path)
-    return summary 
+    return summary
+
+
+@router.get(
+    "/id/{video_id_path:uuid}/related",
+    response_model=List[RecommendationItem],
+    summary="Content-based related list",
+)
+async def get_related_videos_for_video(
+    video_id_path: VideoID,
+    limit: Annotated[int, Query(ge=1, le=20, description="Max number of related videos")] = 5,
+):
+    """Return a list of videos related to the given video.
+
+    The underlying implementation is currently stubbed out and will return the
+    latest videos (excluding the source video) with a random relevance score.
+    """
+
+    related_items = await recommendation_service.get_related_videos(
+        video_id=video_id_path, limit=limit
+    )
+    return related_items 

@@ -13,12 +13,14 @@ from typing import TYPE_CHECKING
 __all__ = [
     "user_service",
     "video_service",
+    "recommendation_service",
 ]
 
 if TYPE_CHECKING:
     # During type checking we want the actual modules.
     from . import user_service as user_service  # noqa: F401
     from . import video_service as video_service  # noqa: F401
+    from . import recommendation_service as recommendation_service  # noqa: F401
 else:
     # At runtime perform the import lazily to keep import graph lighter.
     def __getattr__(name: str) -> ModuleType:  # noqa: D401
