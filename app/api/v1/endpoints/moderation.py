@@ -19,7 +19,7 @@ from app.models.flag import (
 )
 from app.models.common import PaginatedResponse, Pagination
 from app.models.user import User
-from app.services import flag_service
+from app.services import flag_service, user_service
 
 router = APIRouter(prefix="/moderation", tags=["Moderation Actions"])
 
@@ -102,4 +102,46 @@ async def act_on_flag(
         moderator_notes=action_request.moderatorNotes,
         moderator=current_moderator,
     )
-    return updated_flag 
+    return updated_flag
+
+
+@router.get(
+    "/users",
+    response_model=List[User],
+    summary="Search for users (moderator only)",
+)
+async def search_users_endpoint(
+    search_query: Optional[str] = Query(None, alias="q", description="Search text"),
+    current_moderator: Annotated[User, Depends(get_current_moderator)] = None,
+):
+    return await user_service.search_users(query=search_query)
+
+
+@router.post(
+    "/users/{user_id_path:uuid}/assign-moderator",
+    response_model=User,
+    summary="Promote user to moderator",
+)
+async def assign_moderator_endpoint(
+    user_id_path: UUID,
+    current_moderator: Annotated[User, Depends(get_current_moderator)],
+):
+    updated = await user_service.assign_role_to_user(user_id_path, "moderator")
+    if updated is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return updated
+
+
+@router.post(
+    "/users/{user_id_path:uuid}/revoke-moderator",
+    response_model=User,
+    summary="Demote user from moderator",
+)
+async def revoke_moderator_endpoint(
+    user_id_path: UUID,
+    current_moderator: Annotated[User, Depends(get_current_moderator)],
+):
+    updated = await user_service.revoke_role_from_user(user_id_path, "moderator")
+    if updated is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return updated 

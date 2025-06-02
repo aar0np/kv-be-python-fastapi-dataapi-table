@@ -376,3 +376,32 @@ async def test_revoke_role_from_user_removes_role():
         filter={"userid": str(user_id)}, update={"$set": {"roles": ["viewer"]}}
     )
     assert updated_user is not None and "moderator" not in updated_user.roles
+
+
+@pytest.mark.asyncio
+async def test_search_users_with_query():
+    doc = {
+        "userid": str(uuid4()),
+        "firstName": "Alice",
+        "lastName": "Smith",
+        "email": "alice@example.com",
+        "roles": ["viewer"],
+    }
+
+    mock_db = AsyncMock()
+    mock_db.find = MagicMock(return_value=[doc])
+
+    results = await user_service.search_users(query="alice", db_table=mock_db)
+
+    mock_db.find.assert_called_once()
+    assert len(results) == 1 and results[0].email == doc["email"]
+
+
+@pytest.mark.asyncio
+async def test_search_users_no_query():
+    mock_db = AsyncMock()
+    mock_db.find = MagicMock(return_value=[])
+
+    results = await user_service.search_users(db_table=mock_db)
+    mock_db.find.assert_called_once()
+    assert results == []

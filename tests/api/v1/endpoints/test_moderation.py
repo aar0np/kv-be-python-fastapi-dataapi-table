@@ -130,4 +130,49 @@ async def test_action_on_flag_endpoint(moderator_user: User, moderator_token: st
 async def test_moderation_endpoints_require_authentication():
     async with AsyncClient(app=app, base_url="http://test") as ac:
         resp = await ac.get(f"{settings.API_V1_STR}/moderation/flags?page=1&pageSize=10")
-    assert resp.status_code == status.HTTP_401_UNAUTHORIZED 
+    assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.asyncio
+async def test_search_users_endpoint(moderator_user: User, moderator_token: str):
+    with (
+        patch("app.api.v1.endpoints.moderation.user_service.search_users", new_callable=AsyncMock) as mock_search,
+        patch("app.services.user_service.get_user_by_id_from_table", new_callable=AsyncMock) as mock_get_user,
+    ):
+        mock_search.return_value = [moderator_user]
+        mock_get_user.return_value = moderator_user
+        headers = {"Authorization": f"Bearer {moderator_token}"}
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            resp = await ac.get(f"{settings.API_V1_STR}/moderation/users?q=mod", headers=headers)
+        assert resp.status_code == status.HTTP_200_OK
+        mock_search.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_assign_revoke_moderator_endpoints(moderator_user: User, moderator_token: str):
+    target_id = uuid4()
+    updated_user = moderator_user.model_copy(update={"userId": target_id, "roles": ["viewer", "moderator"]})
+
+    with (
+        patch("app.api.v1.endpoints.moderation.user_service.assign_role_to_user", new_callable=AsyncMock) as mock_assign,
+        patch("app.api.v1.endpoints.moderation.user_service.revoke_role_from_user", new_callable=AsyncMock) as mock_revoke,
+        patch("app.services.user_service.get_user_by_id_from_table", new_callable=AsyncMock) as mock_get_user,
+    ):
+        mock_assign.return_value = updated_user
+        mock_revoke.return_value = updated_user.model_copy(update={"roles": ["viewer"]})
+        mock_get_user.return_value = moderator_user
+        headers = {"Authorization": f"Bearer {moderator_token}"}
+
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            resp_assign = await ac.post(
+                f"{settings.API_V1_STR}/moderation/users/{target_id}/assign-moderator",
+                headers=headers,
+            )
+            resp_revoke = await ac.post(
+                f"{settings.API_V1_STR}/moderation/users/{target_id}/revoke-moderator",
+                headers=headers,
+            )
+        assert resp_assign.status_code == status.HTTP_200_OK
+        assert resp_revoke.status_code == status.HTTP_200_OK
+        mock_assign.assert_awaited_once()
+        mock_revoke.assert_awaited_once() 

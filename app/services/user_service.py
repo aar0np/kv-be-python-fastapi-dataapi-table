@@ -1,6 +1,7 @@
 from typing import Optional, Dict, Any, List
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
+import re
 
 from astrapy.db import AstraDBCollection
 
@@ -239,3 +240,36 @@ async def revoke_role_from_user(
         email=user_doc["email"],
         roles=roles,
     )
+
+
+async def search_users(
+    query: Optional[str] = None,
+    db_table: Optional[AstraDBCollection] = None,
+    limit: int = 20,
+) -> List[User]:
+    """Search users by email or name (case-insensitive regex)."""
+
+    table = db_table if db_table is not None else await get_table(USERS_TABLE_NAME)
+
+    query_filter: Dict[str, Any] = {}
+    if query:
+        escaped = re.escape(query)
+        query_filter["$or"] = [
+            {"email": {"$regex": escaped, "$options": "i"}},
+            {"firstName": {"$regex": escaped, "$options": "i"}},
+            {"lastName": {"$regex": escaped, "$options": "i"}},
+        ]
+
+    cursor = table.find(filter=query_filter, limit=limit)
+    docs = await cursor.to_list(length=limit) if hasattr(cursor, "to_list") else cursor
+
+    return [
+        User(
+            userId=UUID(d["userid"]),
+            firstName=d["firstName"],
+            lastName=d["lastName"],
+            email=d["email"],
+            roles=d.get("roles", ["viewer"]),
+        )
+        for d in docs
+    ]
