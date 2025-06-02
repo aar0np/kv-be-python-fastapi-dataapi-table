@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Optional, List
 from uuid import UUID
+from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -19,7 +20,9 @@ from app.models.flag import (
 )
 from app.models.common import PaginatedResponse, Pagination
 from app.models.user import User
-from app.services import flag_service, user_service
+from app.models.video import VideoID
+from app.models.comment import CommentID
+from app.services import flag_service, user_service, video_service, comment_service
 
 router = APIRouter(prefix="/moderation", tags=["Moderation Actions"])
 
@@ -144,4 +147,38 @@ async def revoke_moderator_endpoint(
     updated = await user_service.revoke_role_from_user(user_id_path, "moderator")
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return updated 
+    return updated
+
+
+class ContentRestoreResponse(BaseModel):
+    content_id: UUID
+    content_type: str
+    status_message: str
+
+
+@router.post(
+    "/videos/{video_id_path:uuid}/restore",
+    response_model=ContentRestoreResponse,
+    summary="Restore a soft-deleted video (stub)",
+)
+async def restore_video_endpoint(
+    video_id_path: VideoID,
+    current_moderator: Annotated[User, Depends(get_current_moderator)],
+):
+    success = await video_service.restore_video(video_id_path)
+    msg = "initiated" if success else "failed"
+    return ContentRestoreResponse(content_id=video_id_path, content_type="video", status_message=msg)
+
+
+@router.post(
+    "/comments/{comment_id_path:uuid}/restore",
+    response_model=ContentRestoreResponse,
+    summary="Restore a soft-deleted comment (stub)",
+)
+async def restore_comment_endpoint(
+    comment_id_path: CommentID,
+    current_moderator: Annotated[User, Depends(get_current_moderator)],
+):
+    success = await comment_service.restore_comment(comment_id_path)
+    msg = "initiated" if success else "failed"
+    return ContentRestoreResponse(content_id=comment_id_path, content_type="comment", status_message=msg) 

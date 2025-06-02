@@ -15,7 +15,6 @@ from app.models.flag import (
     ContentTypeEnum,
     FlagReasonCodeEnum,
     FlagStatusEnum,
-    FlagUpdateRequest,
 )
 
 
@@ -175,4 +174,25 @@ async def test_assign_revoke_moderator_endpoints(moderator_user: User, moderator
         assert resp_assign.status_code == status.HTTP_200_OK
         assert resp_revoke.status_code == status.HTTP_200_OK
         mock_assign.assert_awaited_once()
-        mock_revoke.assert_awaited_once() 
+        mock_revoke.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_restore_endpoints(moderator_user: User, moderator_token: str):
+    with (
+        patch("app.api.v1.endpoints.moderation.video_service.restore_video", new_callable=AsyncMock) as mock_restore_video,
+        patch("app.api.v1.endpoints.moderation.comment_service.restore_comment", new_callable=AsyncMock) as mock_restore_comment,
+        patch("app.services.user_service.get_user_by_id_from_table", new_callable=AsyncMock) as mock_get_user,
+    ):
+        mock_restore_video.return_value = True
+        mock_restore_comment.return_value = True
+        mock_get_user.return_value = moderator_user
+        headers = {"Authorization": f"Bearer {moderator_token}"}
+        vid = uuid4(); cid = uuid4()
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            resp_video = await ac.post(f"{settings.API_V1_STR}/moderation/videos/{vid}/restore", headers=headers)
+            resp_comment = await ac.post(f"{settings.API_V1_STR}/moderation/comments/{cid}/restore", headers=headers)
+        assert resp_video.status_code == status.HTTP_200_OK
+        assert resp_comment.status_code == status.HTTP_200_OK
+        mock_restore_video.assert_awaited_once_with(vid)
+        mock_restore_comment.assert_awaited_once_with(cid) 

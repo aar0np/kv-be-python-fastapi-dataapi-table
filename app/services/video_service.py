@@ -480,4 +480,15 @@ async def suggest_tags(
                     tag_set.add(t)
 
     matching = [t for t in sorted(tag_set) if query.lower() in t.lower()]
-    return [TagSuggestion(tag=t) for t in matching[:limit]] 
+    return [TagSuggestion(tag=t) for t in matching[:limit]]
+
+
+async def restore_video(video_id: VideoID) -> bool:
+    """Stub to mark video for restoration (no-op)."""
+
+    video = await get_video_by_id(video_id)
+    if video is None:
+        print(f"STUB: Video {video_id} not found for restore.")
+        return False
+    print(f"STUB: Restoring video {video_id}. Currently deleted: {getattr(video, 'is_deleted', False)}")
+    return True 

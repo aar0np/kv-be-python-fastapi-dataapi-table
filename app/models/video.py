@@ -63,6 +63,8 @@ class Video(VideoBase):
     viewCount: int = 0
     averageRating: Optional[float] = None
     totalRatingsCount: int = 0
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
 
 
 class VideoUpdateRequest(BaseModel):

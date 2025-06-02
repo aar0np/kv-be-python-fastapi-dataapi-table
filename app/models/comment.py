@@ -35,6 +35,8 @@ class Comment(CommentBase):
     createdAt: datetime
     updatedAt: datetime
     sentiment: Optional[str] = None  # placeholder (positive/neutral/negative)
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
 
 
 class CommentResponse(Comment):

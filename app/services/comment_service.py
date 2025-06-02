@@ -132,4 +132,14 @@ async def get_comment_by_id(
     if doc is None:
         return None
 
-    return _doc_to_comment(doc) 
+    return _doc_to_comment(doc)
+
+
+async def restore_comment(comment_id: CommentID) -> bool:
+    """Stub restore comment."""
+    comment = await get_comment_by_id(comment_id)
+    if comment is None:
+        print(f"STUB: Comment {comment_id} not found for restore.")
+        return False
+    print(f"STUB: Restoring comment {comment_id}. Deleted: {getattr(comment,'is_deleted',False)}")
+    return True 
