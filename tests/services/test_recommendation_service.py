@@ -3,9 +3,10 @@ from uuid import uuid4
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
-from app.services.recommendation_service import get_related_videos
+from app.services.recommendation_service import get_related_videos, get_personalized_for_you_videos
 from app.models.video import Video, VideoStatusEnum, VideoSummary, VideoID
 from app.models.recommendation import RecommendationItem
+from app.models.user import User
 
 
 @pytest.fixture
@@ -89,4 +90,47 @@ async def test_get_related_videos_source_not_found(sample_video_id):
         mock_get_video.return_value = None
 
         items = await get_related_videos(video_id=sample_video_id, limit=5)
-        assert items == [] 
+        assert items == []
+
+
+@pytest.mark.asyncio
+async def test_get_personalized_for_you_videos_calls_video_service(sample_video):
+    dummy_user = User(
+        userId=uuid4(),
+        firstName="Viewer",
+        lastName="Test",
+        email="viewer@test.com",
+        roles=["viewer"],
+    )
+
+    page = 2
+    size = 3
+
+    sample_summaries = [
+        VideoSummary(
+            videoId=uuid4(),
+            title="Vid",
+            thumbnailUrl=None,
+            userId=dummy_user.userId,
+            submittedAt=datetime.now(timezone.utc),
+            viewCount=0,
+            averageRating=None,
+        )
+        for _ in range(size)
+    ]
+
+    with patch(
+        "app.services.recommendation_service.video_service.list_latest_videos",
+        new_callable=AsyncMock,
+    ) as mock_list_latest:
+        mock_list_latest.return_value = (sample_summaries, 42)
+
+        videos, total = await get_personalized_for_you_videos(
+            current_user=dummy_user,
+            page=page,
+            page_size=size,
+        )
+
+        mock_list_latest.assert_awaited_once_with(page=page, page_size=size)
+        assert videos == sample_summaries
+        assert total == 42 

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import random
-from typing import List
+from typing import List, Tuple
 
-from app.models.video import VideoID
+from app.models.video import VideoID, VideoSummary
 from app.models.recommendation import RecommendationItem
 from app.services import video_service
+from app.models.user import User
 
 
 async def get_related_videos(video_id: VideoID, limit: int = 10) -> List[RecommendationItem]:
@@ -44,4 +45,25 @@ async def get_related_videos(video_id: VideoID, limit: int = 10) -> List[Recomme
             )
         )
 
-    return related_items 
+    return related_items
+
+
+async def get_personalized_for_you_videos(
+    current_user: User,
+    page: int,
+    page_size: int,
+) -> Tuple[List[VideoSummary], int]:
+    """Return a stubbed personalised feed for *current_user*.
+
+    The implementation simply proxies to :pyfunc:`video_service.list_latest_videos` for now, but the
+    function signature and logging establish the contract expected by higher layers so that a real
+    recommender can be dropped-in later without further API changes.
+    """
+
+    # For visibility during development/testing.
+    print(
+        f"STUB: Generating 'For You' feed for user {current_user.userId} (page={page}, page_size={page_size})"
+    )
+
+    videos, total_items = await video_service.list_latest_videos(page=page, page_size=page_size)
+    return videos, total_items 
