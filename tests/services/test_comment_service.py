@@ -116,4 +116,37 @@ async def test_list_comments_by_user():
     comments, total = await comment_service.list_comments_by_user(
         user_id=uuid4(), page=1, page_size=10, db_table=mock_db
     )
-    assert comments == [] and total == 0 
+    assert comments == [] and total == 0
+
+
+@pytest.mark.asyncio
+async def test_get_comment_by_id_found():
+    comment_id = uuid4()
+    sample_doc = {
+        "commentId": str(comment_id),
+        "videoId": str(uuid4()),
+        "userId": str(uuid4()),
+        "text": "sample",
+        "createdAt": datetime.now(timezone.utc),
+        "updatedAt": datetime.now(timezone.utc),
+    }
+
+    mock_db = AsyncMock()
+    mock_db.find_one.return_value = sample_doc
+
+    comment = await comment_service.get_comment_by_id(comment_id=comment_id, db_table=mock_db)
+
+    mock_db.find_one.assert_called_once_with(filter={"commentId": str(comment_id)})
+    assert comment is not None and comment.commentId == comment_id
+
+
+@pytest.mark.asyncio
+async def test_get_comment_by_id_not_found():
+    comment_id = uuid4()
+    mock_db = AsyncMock()
+    mock_db.find_one.return_value = None
+
+    comment = await comment_service.get_comment_by_id(comment_id=comment_id, db_table=mock_db)
+
+    mock_db.find_one.assert_called_once_with(filter={"commentId": str(comment_id)})
+    assert comment is None 

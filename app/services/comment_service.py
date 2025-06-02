@@ -10,7 +10,7 @@ from uuid import uuid4, UUID
 from fastapi import HTTPException, status
 
 from app.db.astra_client import get_table, AstraDBCollection
-from app.models.comment import CommentCreateRequest, Comment
+from app.models.comment import CommentCreateRequest, Comment, CommentID
 from app.models.user import User
 from app.models.video import VideoID, VideoStatusEnum
 from app.services import video_service
@@ -116,4 +116,20 @@ async def list_comments_by_user(
     cursor = db_table.find(filter=query_filter, skip=skip, limit=page_size, sort={"createdAt": -1})
     docs = await cursor.to_list(length=page_size) if hasattr(cursor, "to_list") else cursor
     total = await db_table.count_documents(filter=query_filter)
-    return [_doc_to_comment(d) for d in docs], total 
+    return [_doc_to_comment(d) for d in docs], total
+
+
+async def get_comment_by_id(
+    comment_id: CommentID,
+    db_table: Optional[AstraDBCollection] = None,
+) -> Optional[Comment]:
+    """Fetch a single comment by its identifier, returning `None` if not found."""
+
+    if db_table is None:
+        db_table = await get_table(COMMENTS_TABLE_NAME)
+
+    doc = await db_table.find_one(filter={"commentId": str(comment_id)})
+    if doc is None:
+        return None
+
+    return _doc_to_comment(doc) 

@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
@@ -143,4 +143,99 @@ async def update_user_in_table(
         lastName=updated_user_doc["lastName"],
         email=updated_user_doc["email"],
         roles=updated_user_doc.get("roles", ["viewer"]),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Role management helpers (moderator, creator, etc.)
+# ---------------------------------------------------------------------------
+
+
+async def _update_user_roles(
+    *,
+    user_id: UUID,
+    new_roles: List[str],
+    db_table: Optional[AstraDBCollection] = None,
+) -> Optional[User]:
+    """Helper to persist updated roles list and return the fresh `User` object."""
+
+    table = db_table if db_table is not None else await get_table(USERS_TABLE_NAME)
+
+    await table.update_one(
+        filter={"userid": str(user_id)},
+        update={"$set": {"roles": new_roles}},
+    )
+
+    # Fetch updated doc
+    updated_doc = await table.find_one(filter={"userid": str(user_id)})
+    if updated_doc is None:
+        return None
+
+    return User(
+        userId=user_id,
+        firstName=updated_doc["firstName"],
+        lastName=updated_doc["lastName"],
+        email=updated_doc["email"],
+        roles=updated_doc.get("roles", ["viewer"]),
+    )
+
+
+async def assign_role_to_user(
+    user_to_modify_id: UUID,
+    role_to_assign: str,
+    db_table: Optional[AstraDBCollection] = None,
+) -> Optional[User]:
+    """Append a role to the user's role list if not already present."""
+
+    table = db_table if db_table is not None else await get_table(USERS_TABLE_NAME)
+
+    user_doc = await table.find_one(filter={"userid": str(user_to_modify_id)})
+    if user_doc is None:
+        return None
+
+    roles: List[str] = user_doc.get("roles", ["viewer"])
+    if role_to_assign not in roles:
+        roles.append(role_to_assign)
+        return await _update_user_roles(
+            user_id=user_to_modify_id, new_roles=roles, db_table=table
+        )
+
+    # Role already present — simply return current user model
+    return User(
+        userId=user_to_modify_id,
+        firstName=user_doc["firstName"],
+        lastName=user_doc["lastName"],
+        email=user_doc["email"],
+        roles=roles,
+    )
+
+
+async def revoke_role_from_user(
+    user_to_modify_id: UUID,
+    role_to_revoke: str,
+    db_table: Optional[AstraDBCollection] = None,
+) -> Optional[User]:
+    """Remove a role from the user's role list; no-op if role absent."""
+
+    table = db_table if db_table is not None else await get_table(USERS_TABLE_NAME)
+
+    user_doc = await table.find_one(filter={"userid": str(user_to_modify_id)})
+    if user_doc is None:
+        return None
+
+    roles: List[str] = user_doc.get("roles", ["viewer"])
+
+    if role_to_revoke in roles:
+        roles.remove(role_to_revoke)
+        return await _update_user_roles(
+            user_id=user_to_modify_id, new_roles=roles, db_table=table
+        )
+
+    # Role not present — return current user model
+    return User(
+        userId=user_to_modify_id,
+        firstName=user_doc["firstName"],
+        lastName=user_doc["lastName"],
+        email=user_doc["email"],
+        roles=roles,
     )

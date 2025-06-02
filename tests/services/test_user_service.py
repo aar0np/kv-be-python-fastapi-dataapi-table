@@ -321,3 +321,58 @@ async def test_update_user_in_table_user_not_found_initially():
     assert updated_user is None
     mock_db_table.find_one.assert_called_once_with(filter={"userid": str(user_id)})
     mock_db_table.update_one.assert_not_called()
+
+
+# --- Tests for role assignment and revocation ---
+
+@pytest.mark.asyncio
+async def test_assign_role_to_user_adds_role():
+    user_id = uuid4()
+    initial_doc = {
+        "userid": str(user_id),
+        "firstName": "First",
+        "lastName": "Last",
+        "email": "a@b.com",
+        "roles": ["viewer"],
+    }
+    updated_doc = {**initial_doc, "roles": ["viewer", "moderator"]}
+
+    mock_db = AsyncMock()
+    mock_db.find_one.side_effect = [initial_doc, updated_doc]
+    mock_db.update_one.return_value = MagicMock()
+
+    updated_user = await user_service.assign_role_to_user(
+        user_to_modify_id=user_id, role_to_assign="moderator", db_table=mock_db
+    )
+
+    # Ensure update_one called with roles plus moderator
+    mock_db.update_one.assert_called_once_with(
+        filter={"userid": str(user_id)}, update={"$set": {"roles": ["viewer", "moderator"]}}
+    )
+    assert updated_user is not None and "moderator" in updated_user.roles
+
+
+@pytest.mark.asyncio
+async def test_revoke_role_from_user_removes_role():
+    user_id = uuid4()
+    initial_doc = {
+        "userid": str(user_id),
+        "firstName": "First",
+        "lastName": "Last",
+        "email": "a@b.com",
+        "roles": ["viewer", "moderator"],
+    }
+    updated_doc = {**initial_doc, "roles": ["viewer"]}
+
+    mock_db = AsyncMock()
+    mock_db.find_one.side_effect = [initial_doc, updated_doc]
+    mock_db.update_one.return_value = MagicMock()
+
+    updated_user = await user_service.revoke_role_from_user(
+        user_to_modify_id=user_id, role_to_revoke="moderator", db_table=mock_db
+    )
+
+    mock_db.update_one.assert_called_once_with(
+        filter={"userid": str(user_id)}, update={"$set": {"roles": ["viewer"]}}
+    )
+    assert updated_user is not None and "moderator" not in updated_user.roles

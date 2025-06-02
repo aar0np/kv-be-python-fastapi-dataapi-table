@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from typing import List, Tuple
 
-from app.models.video import VideoID
+from app.models.video import VideoID, VideoSummary
 from app.models.recommendation import (
     RecommendationItem,
     EmbeddingIngestRequest,

@@ -14,6 +14,8 @@ __all__ = [
     "user_service",
     "video_service",
     "recommendation_service",
+    "comment_service",
+    "flag_service",
 ]
 
 if TYPE_CHECKING:
@@ -21,6 +23,8 @@ if TYPE_CHECKING:
     from . import user_service as user_service  # noqa: F401
     from . import video_service as video_service  # noqa: F401
     from . import recommendation_service as recommendation_service  # noqa: F401
+    from . import comment_service as comment_service  # noqa: F401
+    from . import flag_service as flag_service  # noqa: F401
 else:
     # At runtime perform the import lazily to keep import graph lighter.
     def __getattr__(name: str) -> ModuleType:  # noqa: D401
