@@ -3,8 +3,12 @@ from __future__ import annotations
 import random
 from typing import List, Tuple
 
-from app.models.video import VideoID, VideoSummary
-from app.models.recommendation import RecommendationItem
+from app.models.video import VideoID
+from app.models.recommendation import (
+    RecommendationItem,
+    EmbeddingIngestRequest,
+    EmbeddingIngestResponse,
+)
 from app.services import video_service
 from app.models.user import User
 
@@ -66,4 +70,40 @@ async def get_personalized_for_you_videos(
     )
 
     videos, total_items = await video_service.list_latest_videos(page=page, page_size=page_size)
-    return videos, total_items 
+    return videos, total_items
+
+
+# ---------------------------------------------------------------------------
+# Embedding ingestion stub
+# ---------------------------------------------------------------------------
+
+
+async def ingest_video_embedding(request: EmbeddingIngestRequest) -> EmbeddingIngestResponse:
+    """Receive and store (stub) a video's vector embedding.
+
+    A real implementation would persist the vector into a vector database or as part of the
+    video document. For now we simply validate that the video exists and return an acknowledgement.
+    """
+
+    target_video = await video_service.get_video_by_id(request.videoId)
+
+    if target_video is None:
+        # Service chooses to return an error payload; router may convert to HTTPException.
+        return EmbeddingIngestResponse(
+            videoId=request.videoId,
+            status="error",
+            message=f"Video {request.videoId} not found.",
+        )
+
+    print(
+        f"STUB: Received embedding for video {request.videoId}. "
+        f"Vector dimension: {len(request.vector)}. First 3 dims: {request.vector[:3]}"
+    )
+
+    # Placeholder for updating database / vector store.
+
+    return EmbeddingIngestResponse(
+        videoId=request.videoId,
+        status="received_stub",
+        message="Embedding data received and acknowledged (stub).",
+    ) 

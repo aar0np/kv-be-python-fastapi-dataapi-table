@@ -133,4 +133,44 @@ async def test_get_personalized_for_you_videos_calls_video_service(sample_video)
 
         mock_list_latest.assert_awaited_once_with(page=page, page_size=size)
         assert videos == sample_summaries
-        assert total == 42 
+        assert total == 42
+
+
+@pytest.mark.asyncio
+async def test_ingest_embedding_video_exists(sample_video):
+    from app.models.recommendation import EmbeddingIngestRequest
+
+    req = EmbeddingIngestRequest(videoId=sample_video.videoId, vector=[0.1, 0.2, 0.3])
+
+    with patch(
+        "app.services.recommendation_service.video_service.get_video_by_id",
+        new_callable=AsyncMock,
+    ) as mock_get_video:
+        mock_get_video.return_value = sample_video
+
+        from app.services.recommendation_service import ingest_video_embedding
+
+        resp = await ingest_video_embedding(req)
+
+        mock_get_video.assert_awaited_once_with(sample_video.videoId)
+        assert resp.status == "received_stub"
+
+
+@pytest.mark.asyncio
+async def test_ingest_embedding_video_not_found(sample_video_id):
+    from app.models.recommendation import EmbeddingIngestRequest
+
+    req = EmbeddingIngestRequest(videoId=sample_video_id, vector=[0.4, 0.5])
+
+    with patch(
+        "app.services.recommendation_service.video_service.get_video_by_id",
+        new_callable=AsyncMock,
+    ) as mock_get_video:
+        mock_get_video.return_value = None
+
+        from app.services.recommendation_service import ingest_video_embedding
+
+        resp = await ingest_video_embedding(req)
+
+        assert resp.status == "error"
+        assert "not found" in (resp.message or "") 

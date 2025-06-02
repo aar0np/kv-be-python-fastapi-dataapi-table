@@ -8,7 +8,6 @@ from app.models.video import VideoSummary
 from app.models.common import PaginatedResponse, Pagination
 from app.api.v1.dependencies import (
     PaginationParams,
-    common_pagination_params,
     get_current_viewer,
 )
 from app.models.user import User

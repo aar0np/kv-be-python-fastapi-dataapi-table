@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.db.astra_client import init_astra_db
 from app.models.common import ProblemDetail
-from app.api.v1.endpoints import account_management, video_catalog, search_catalog, comments_ratings, recommendations_feed
+from app.api.v1.endpoints import account_management, video_catalog, search_catalog, comments_ratings, recommendations_feed, reco_internal
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ api_router_v1.include_router(video_catalog.router)
 api_router_v1.include_router(search_catalog.router)
 api_router_v1.include_router(comments_ratings.router)
 api_router_v1.include_router(recommendations_feed.router)
+api_router_v1.include_router(reco_internal.router)
 
 app.include_router(api_router_v1)
 

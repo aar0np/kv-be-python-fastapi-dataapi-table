@@ -26,4 +26,28 @@ class RecommendationItem(BaseModel):
 
 __all__ = [
     "RecommendationItem",
-] 
+    "EmbeddingIngestRequest",
+    "EmbeddingIngestResponse",
+]
+
+
+# ---------------------------------------------------------------------------
+# Vector Embedding ingestion
+# ---------------------------------------------------------------------------
+
+
+class EmbeddingIngestRequest(BaseModel):
+    """Payload accepted by the vector‐embedding ingestion endpoint."""
+
+    videoId: VideoID
+    vector: list[float] = Field(
+        ..., description="The vector embedding extracted from the video's content."
+    )
+
+
+class EmbeddingIngestResponse(BaseModel):
+    """Simple acknowledgement returned after receiving an embedding."""
+
+    videoId: VideoID
+    status: str
+    message: Optional[str] = None 
