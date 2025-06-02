@@ -1,7 +1,105 @@
 from __future__ import annotations
 
-"""Placeholder router for moderator actions coming in later prompts."""
+"""Endpoints reserved for moderator actions (flag inbox, flag actions, role mgmt stubs)."""
 
-from fastapi import APIRouter
+from typing import Annotated, Optional, List
+from uuid import UUID
 
-router = APIRouter(prefix="/moderation", tags=["Moderation Actions"]) 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from app.api.v1.dependencies import (
+    get_current_moderator,
+    PaginationParams,
+)
+from app.models.flag import (
+    FlagResponse,
+    FlagUpdateRequest,
+    FlagStatusEnum,
+    Flag,
+)
+from app.models.common import PaginatedResponse, Pagination
+from app.models.user import User
+from app.services import flag_service
+
+router = APIRouter(prefix="/moderation", tags=["Moderation Actions"])
+
+
+# Helper to construct paginated response consistently
+
+def _build_paginated_flags(
+    flags: List[FlagResponse] | List[Flag], total: int, pagination: PaginationParams
+) -> PaginatedResponse[FlagResponse]:
+    # Ensure each item is FlagResponse for strict model validation
+    coerced: List[FlagResponse] = [
+        item if isinstance(item, FlagResponse) else FlagResponse(**item.model_dump())  # type: ignore[arg-type]
+        for item in flags
+    ]
+    total_pages = (total + pagination.pageSize - 1) // pagination.pageSize
+    return PaginatedResponse[
+        FlagResponse  # type: ignore[misc]
+    ](
+        data=coerced,
+        pagination=Pagination(
+            currentPage=pagination.page,
+            pageSize=pagination.pageSize,
+            totalItems=total,
+            totalPages=total_pages,
+        ),
+    )
+
+
+@router.get(
+    "/flags",
+    response_model=PaginatedResponse[FlagResponse],
+    summary="List all flags (moderator inbox)",
+)
+async def list_all_flags(
+    pagination: PaginationParams = Depends(),
+    status_filter: Optional[FlagStatusEnum] = Query(None, alias="status", description="Filter by flag status"),
+    current_moderator: Annotated[User, Depends(get_current_moderator)] = None,
+):
+    flags, total = await flag_service.list_flags(
+        page=pagination.page, page_size=pagination.pageSize, status_filter=status_filter
+    )
+    return _build_paginated_flags(flags, total, pagination)
+
+
+@router.get(
+    "/flags/{flag_id_path:uuid}",
+    response_model=FlagResponse,
+    summary="Get details of a specific flag",
+)
+async def get_flag_details(
+    flag_id_path: UUID,
+    current_moderator: Annotated[User, Depends(get_current_moderator)],
+):
+    flag = await flag_service.get_flag_by_id(flag_id=flag_id_path)
+    if flag is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
+    return flag
+
+
+@router.post(
+    "/flags/{flag_id_path:uuid}/action",
+    response_model=FlagResponse,
+    summary="Take action on a specific flag",
+)
+async def act_on_flag(
+    flag_id_path: UUID,
+    action_request: FlagUpdateRequest,
+    current_moderator: Annotated[User, Depends(get_current_moderator)],
+):
+    flag_obj = await flag_service.get_flag_by_id(flag_id=flag_id_path)
+    if flag_obj is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
+
+    if flag_obj.status not in {FlagStatusEnum.OPEN, FlagStatusEnum.UNDER_REVIEW}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Flag already resolved")
+
+    updated_flag = await flag_service.action_on_flag(
+        flag_to_action=flag_obj,
+        new_status=action_request.status,
+        moderator_notes=action_request.moderatorNotes,
+        moderator=current_moderator,
+    )
+    return updated_flag 
