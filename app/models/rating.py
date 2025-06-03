@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
-
 from pydantic import BaseModel, Field
 
 from app.models.video import VideoID
+from app.models.common import UserID
 
-UserID = UUID
 RatingValue = int
 
 

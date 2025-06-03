@@ -16,9 +16,9 @@ from datetime import datetime
 from pydantic import BaseModel, Field, HttpUrl
 
 # ---------------------------------------------------------------------------
-# Aliases
+# Aliases (centralized)
 # ---------------------------------------------------------------------------
-VideoID = UUID
+from app.models.common import VideoID
 
 
 # ---------------------------------------------------------------------------

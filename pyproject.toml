@@ -26,3 +26,10 @@ email-validator = "^2.2.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+# ---------------------------------------------------------------------------
+# Ruff configuration
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+extend-ignore = ["E402", "E702"]

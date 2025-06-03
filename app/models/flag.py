@@ -10,17 +10,9 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
-# Aliases
+# Aliases (centralized)
 # ---------------------------------------------------------------------------
-FlagID = UUID
-
-# These aliases import lazily to avoid circular import issues at runtime.
-try:
-    from app.models.video import VideoID  # noqa: F401
-    from app.models.comment import CommentID  # noqa: F401
-except ImportError:  # pragma: no cover – during isolated import in some contexts
-    VideoID = UUID  # type: ignore
-    CommentID = UUID  # type: ignore
+from app.models.common import FlagID
 
 # ---------------------------------------------------------------------------
 # Enums

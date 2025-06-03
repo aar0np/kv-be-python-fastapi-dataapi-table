@@ -4,14 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-# Avoid circular import issues by defining local aliases.
-UserID = UUID  # TODO: move to common types module
-VideoID = UUID
-CommentID = UUID
+# Import centralized type aliases
+from app.models.common import UserID, VideoID, CommentID
 
 
 class CommentBase(BaseModel):
