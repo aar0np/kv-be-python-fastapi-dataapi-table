@@ -1,3 +1,13 @@
+"""KillrVideo monolithic FastAPI application.
+
+This file assembles **all** routers from the various domain services into a
+single FastAPI instance.  It is ideal for local development and testing or for
+deployments that prefer a unified 'monolith' instead of separate micro-services.
+
+If you intend to run the new micro-service containers, use their dedicated
+entry-points (e.g. ``app.main_user:service_app``) instead.
+"""
+
 import logging
 from http import HTTPStatus
 
@@ -11,7 +21,7 @@ from app.api.v1.endpoints import account_management, video_catalog, search_catal
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title=settings.PROJECT_NAME)
+app = FastAPI(title="KillrVideo 2025 - Monolith Backend")
 
 # API router for v1
 api_router_v1 = APIRouter(prefix=settings.API_V1_STR)
