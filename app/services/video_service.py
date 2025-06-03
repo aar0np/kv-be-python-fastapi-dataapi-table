@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+import asyncio
 from typing import Optional, List, Dict, Any, Tuple
 from uuid import UUID, uuid4
 
@@ -27,6 +28,10 @@ from app.models.video import (
     TagSuggestion,
 )
 from app.models.user import User
+
+from pydantic import HttpUrl
+
+from app.external_services.youtube_mock import MockYouTubeService
 
 # ---------------------------------------------------------------------------
 # Constants & Regex Patterns
@@ -148,14 +153,62 @@ async def submit_new_video(
 
 
 async def process_video_submission(video_id: VideoID, youtube_video_id: str) -> None:  # noqa: D401,E501
-    """Background task stub that will eventually process submitted videos.
+    """Fetch metadata for the submitted YouTube video and update DB status.
 
-    For now we simply log the invocation so we can confirm the task was queued.
+    The implementation deliberately stays *lightweight* – it calls a mocked
+    YouTube service, writes interim *PROCESSING* state to the database, waits
+    a few seconds to emulate work being done, and finally marks the record
+    *READY* or *ERROR* depending on whether details were retrieved.
     """
 
+    mock_yt_service = MockYouTubeService()
+
+    # Retrieve video details (this could raise, but the mock simply returns None)
+    video_details = await mock_yt_service.get_video_details(youtube_video_id)
+
+    videos_table = await get_table(VIDEOS_TABLE_NAME)
+    now = datetime.now(timezone.utc)
+
+    final_status: str = VideoStatusEnum.ERROR.value  # pessimistic default
+    update_payload: Dict[str, Any] = {"updatedAt": now}
+
+    if video_details:
+        # Interim update – mark as processing with the metadata we have so far
+        update_payload.update(
+            {
+                "title": video_details.get("title", "Title Not Found"),
+                "description": video_details.get("description"),
+                "thumbnailUrl": HttpUrl(video_details["thumbnail_url"]) if video_details.get("thumbnail_url") else None,  # type: ignore[arg-type]
+                "status": VideoStatusEnum.PROCESSING.value,
+            }
+        )
+
+        print(
+            f"BACKGROUND TASK: Video {video_id} - Simulating processing (5s)..."
+        )
+
+        # Write interim processing state (use a shallow copy to avoid later mutation side-effects in tests)
+        await videos_table.update_one(
+            filter={"videoId": str(video_id)}, update={"$set": dict(update_payload)}
+        )
+
+        # Simulate lengthy processing
+        await asyncio.sleep(5)
+
+        final_status = VideoStatusEnum.READY.value
+    else:
+        update_payload["title"] = "Error Processing Video: Details Not Found"
+
+    # Final state update – create a *new* payload to prevent accidental mutation of the
+    # data object already sent to the DB in the previous call.
+    final_payload = {**update_payload, "status": final_status}
+
+    await videos_table.update_one(
+        filter={"videoId": str(video_id)}, update={"$set": final_payload}
+    )
+
     print(
-        f"BACKGROUND TASK: Processing video {video_id} for YouTube ID {youtube_video_id}. "
-        "TODO: Implement actual processing."
+        f"BACKGROUND TASK COMPLETED: Video {video_id} processed. Final Status: {final_status}"
     )
 
 
@@ -463,7 +516,6 @@ async def suggest_tags(
         sort={"submittedAt": -1},
     )
 
-    import asyncio
     if asyncio.iscoroutine(cursor):
         cursor = await cursor
     if hasattr(cursor, "to_list"):

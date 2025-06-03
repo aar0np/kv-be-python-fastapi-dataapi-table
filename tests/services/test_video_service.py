@@ -303,4 +303,70 @@ async def test_suggest_tags_no_match():
     mock_db.find.return_value = []
 
     suggestions = await video_service.suggest_tags("nomatch", limit=5, db_table=mock_db)
-    assert suggestions == [] 
+    assert suggestions == []
+
+
+# ------------------------------------------------------------
+# process_video_submission
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@patch("app.services.video_service.MockYouTubeService")
+@patch("app.services.video_service.get_table")
+@patch("app.services.video_service.asyncio.sleep", new_callable=AsyncMock)
+async def test_process_video_submission_success(mock_sleep, mock_get_table, mock_mock_yt):  # noqa: D401,E501
+    """Verify happy path where YouTube details are found and status transitions
+    PENDING -> PROCESSING -> READY.
+    """
+
+    # Arrange mocks
+    mock_instance = mock_mock_yt.return_value
+    mock_instance.get_video_details = AsyncMock(
+        return_value={
+            "title": "Unit Test Title",
+            "description": "Unit Test Desc",
+            "thumbnail_url": "https://example.com/thumb.jpg",
+        }
+    )
+
+    db_mock = AsyncMock()
+    mock_get_table.return_value = db_mock
+
+    vid = uuid4()
+
+    # Act
+    await video_service.process_video_submission(vid, "known_good_id")
+
+    # Assert
+    # Expect two calls to update_one: first PROCESSING, then READY
+    assert db_mock.update_one.call_count == 2
+
+    first_call_kwargs = db_mock.update_one.call_args_list[0].kwargs
+    assert first_call_kwargs["update"]["$set"]["status"] == video_service.VideoStatusEnum.PROCESSING.value
+
+    second_call_kwargs = db_mock.update_one.call_args_list[1].kwargs
+    assert second_call_kwargs["update"]["$set"]["status"] == video_service.VideoStatusEnum.READY.value
+
+
+@pytest.mark.asyncio
+@patch("app.services.video_service.MockYouTubeService")
+@patch("app.services.video_service.get_table")
+@patch("app.services.video_service.asyncio.sleep", new_callable=AsyncMock)
+async def test_process_video_submission_failure(mock_sleep, mock_get_table, mock_mock_yt):  # noqa: D401,E501
+    """Verify path where YouTube details *aren't* found leading to ERROR status."""
+
+    mock_instance = mock_mock_yt.return_value
+    mock_instance.get_video_details = AsyncMock(return_value=None)
+
+    db_mock = AsyncMock()
+    mock_get_table.return_value = db_mock
+
+    vid = uuid4()
+
+    await video_service.process_video_submission(vid, "known_bad_id")
+
+    # Only one DB update expected when details not found (ERROR status)
+    db_mock.update_one.assert_called_once()
+    call_kwargs = db_mock.update_one.call_args.kwargs
+    assert call_kwargs["update"]["$set"]["status"] == video_service.VideoStatusEnum.ERROR.value 

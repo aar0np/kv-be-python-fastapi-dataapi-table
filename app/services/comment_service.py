@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import random
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple, Dict, Any
 from uuid import uuid4, UUID
@@ -14,14 +13,16 @@ from app.models.comment import CommentCreateRequest, Comment, CommentID
 from app.models.user import User
 from app.models.video import VideoID, VideoStatusEnum
 from app.services import video_service
+from app.external_services.sentiment_mock import MockSentimentAnalyzer
 
 COMMENTS_TABLE_NAME = "comments"
 
 
 async def _determine_sentiment(text: str) -> Optional[str]:
-    """Placeholder sentiment analysis; returns pos/neu/neg randomly."""
+    """Determine sentiment using a mocked analyser for deterministic results."""
 
-    return random.choice(["positive", "neutral", "negative", None])
+    analyzer = MockSentimentAnalyzer()
+    return await analyzer.analyze(text)
 
 
 async def add_comment_to_video(
