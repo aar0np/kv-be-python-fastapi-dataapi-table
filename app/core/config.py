@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from app.version import __version__ as app_version
 
 
 class Settings(BaseSettings):
@@ -18,6 +19,19 @@ class Settings(BaseSettings):
     # Pagination defaults
     DEFAULT_PAGE_SIZE: int = 10
     MAX_PAGE_SIZE: int = 100
+
+    # CORS – provide comma-separated string in env ("*" for all)
+    CORS_ALLOW_ORIGINS: str = "*"
+
+    @property
+    def parsed_cors_origins(self) -> list[str]:  # noqa: D401
+        raw = self.CORS_ALLOW_ORIGINS
+        if raw.strip() == "*":
+            return ["*"]
+        return [o.strip() for o in raw.split(",") if o.strip()]
+
+    # Application build version (surfaced in OpenAPI docs)
+    APP_VERSION: str = app_version
 
     class Config:
         env_file = ".env"

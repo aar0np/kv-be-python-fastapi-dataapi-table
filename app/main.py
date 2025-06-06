@@ -21,7 +21,7 @@ from app.api.v1.endpoints import account_management, video_catalog, search_catal
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="KillrVideo v2 - Monolith Backend")
+app = FastAPI(title="KillrVideo 2025 - Monolith Backend", version=settings.APP_VERSION)
 
 # API router for v1
 api_router_v1 = APIRouter(prefix=settings.API_V1_STR)

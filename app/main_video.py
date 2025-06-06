@@ -15,12 +15,13 @@ logger = logging.getLogger(__name__)
 
 service_app = FastAPI(
     title="KillrVideo - Video Service",
+    version=settings.APP_VERSION,
     openapi_url=f"{settings.API_V1_STR}/videos/openapi.json",
 )
 
 service_app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.parsed_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

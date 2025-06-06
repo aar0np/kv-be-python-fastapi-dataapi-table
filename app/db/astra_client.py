@@ -27,7 +27,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
     try:
         # Try new astrapy v2 names
-        from astrapy import DataAPIClient, AsyncCollection  # type: ignore
+        from astrapy import DataAPIClient, AsyncCollection  # type: ignore  # noqa: F401,F811
     except ModuleNotFoundError:  # pragma: no cover - astrapy not installed at all
         # Provide minimal stubs so that unit tests can run without the library.
         DataAPIClient = None  # type: ignore
@@ -66,7 +66,7 @@ except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
 
     else:
         # astrapy v2 is available – define wrapper using actual client
-        from astrapy import DataAPIClient, AsyncCollection  # type: ignore
+        from astrapy import DataAPIClient, AsyncCollection  # type: ignore  # noqa: F401,F811
 
         class _AstraDBV2Wrapper:  # noqa: D401
             """Compatibility shim for astrapy v2."""

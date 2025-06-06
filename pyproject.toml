@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "killrvideo-python-fastapi-backend"
-version = "0.1.0"
+version = "2.0.0-alpha"
 description = "KillrVideo Python FastAPI Backend"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
