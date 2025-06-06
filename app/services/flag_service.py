@@ -119,7 +119,7 @@ async def list_flags(
     )
 
     docs = (
-        await cursor.to_list(length=page_size) if hasattr(cursor, "to_list") else cursor
+        await cursor.to_list() if hasattr(cursor, "to_list") else cursor
     )
 
     total_items = await db_table.count_documents(filter=query_filter)

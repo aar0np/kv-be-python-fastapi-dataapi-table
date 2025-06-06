@@ -3,7 +3,37 @@ from uuid import UUID, uuid4
 from datetime import datetime, timezone
 import re
 
-from astrapy.db import AstraDBCollection
+# Legacy astrapy (<2) exposed AstraDBCollection in astrapy.db. Starting from
+# v2 the equivalent type is `astrapy.AsyncCollection`.  The following logic
+# tries the old import first and falls back to the new one, ultimately falling
+# back to a simple stub when the real library is unavailable (e.g. in CI).
+
+try:
+    from astrapy.db import AstraDBCollection  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    try:
+        from astrapy import AsyncCollection as AstraDBCollection  # type: ignore
+    except ModuleNotFoundError:  # pragma: no cover - tests / CI without astrapy
+
+        class AstraDBCollection:  # type: ignore
+            async def find_one(self, *args, **kwargs):
+                return None
+
+            async def insert_one(self, *args, **kwargs):
+                return {}
+
+            async def update_one(self, *args, **kwargs):
+                return {}
+
+            # Additional helpers for list-based operations in unit tests/CI
+            def find(self, *args, **kwargs):  # type: ignore[override]
+                return []
+
+            async def to_list(self, *args, **kwargs):  # noqa: D401
+                return []
+
+            async def count_documents(self, *args, **kwargs):  # noqa: D401
+                return 0
 
 from app.db.astra_client import get_table
 from app.models.user import UserCreateRequest, User, UserProfileUpdateRequest
@@ -261,7 +291,7 @@ async def search_users(
         ]
 
     cursor = table.find(filter=query_filter, limit=limit)
-    docs = await cursor.to_list(length=limit) if hasattr(cursor, "to_list") else cursor
+    docs = await cursor.to_list() if hasattr(cursor, "to_list") else cursor
 
     return [
         User(

@@ -1,0 +1,553 @@
+openapi: 3.0.3
+info:
+  title: KillrVideo 2025 API
+  version: 1.0.0
+  description: Public contract for the KillrVideo reference application
+servers:
+- url: /api/v1
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    videoId:
+      name: videoId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    tag:
+      name: tag
+      in: path
+      required: true
+      schema:
+        type: string
+    userId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    flagId:
+      name: flagId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    commentId:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+security:
+- bearerAuth: []
+paths:
+  /users/register:
+    post:
+      tags:
+      - Users
+      summary: Register
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+  /users/login:
+    post:
+      tags:
+      - Users
+      summary: Login
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+  /users/me:
+    get:
+      tags:
+      - Users
+      summary: Profile
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+    put:
+      tags:
+      - Users
+      summary: Update profile
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+  /videos:
+    post:
+      tags:
+      - Videos
+      summary: Submit video
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+  /videos/{videoId}/status:
+    get:
+      tags:
+      - Videos
+      summary: Video status
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+  /videos/{videoId}:
+    get:
+      tags:
+      - Videos
+      summary: Get video
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+    put:
+      tags:
+      - Videos
+      summary: Update video
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+  /videos/{videoId}/view:
+    post:
+      tags:
+      - Videos
+      summary: Record view
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+  /videos/latest:
+    get:
+      tags:
+      - Videos
+      summary: Latest videos
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+  /videos/by-tag/{tag}:
+    get:
+      tags:
+      - Videos
+      summary: Videos by tag
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/tag'
+  /users/{userId}/videos:
+    get:
+      tags:
+      - Videos
+      summary: Videos by user
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/userId'
+  /videos/{videoId}/comments:
+    post:
+      tags:
+      - Comments
+      summary: Add comment
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+    get:
+      tags:
+      - Comments
+      summary: List comments
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+  /users/{userId}/comments:
+    get:
+      tags:
+      - Comments
+      summary: Comments by user
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/userId'
+  /videos/{videoId}/ratings:
+    post:
+      tags:
+      - Ratings
+      summary: Rate video
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+    get:
+      tags:
+      - Ratings
+      summary: Get ratings
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+  /search/videos:
+    get:
+      tags:
+      - Search
+      summary: Search videos
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+  /tags/suggest:
+    get:
+      tags:
+      - Search
+      summary: Tag suggestions
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+  /videos/{videoId}/related:
+    get:
+      tags:
+      - Recommendations
+      summary: Related videos
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+  /recommendations/foryou:
+    get:
+      tags:
+      - Recommendations
+      summary: Personalized recommendations
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+  /reco/ingest:
+    post:
+      tags:
+      - Recommendations
+      summary: Ingest embedding
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+  /videos/{videoId}/flags:
+    post:
+      tags:
+      - Moderation
+      summary: Flag video
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+    get:
+      tags:
+      - Moderation
+      summary: List flags
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+  /videos/{videoId}/flags/{flagId}:
+    patch:
+      tags:
+      - Moderation
+      summary: Act on flag
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+      - $ref: '#/components/parameters/flagId'
+  /flags:
+    post:
+      tags:
+      - Moderation
+      summary: Flag content
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+  /moderation/flags:
+    get:
+      tags:
+      - Moderation
+      summary: Flag inbox
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+  /moderation/flags/{flagId}:
+    get:
+      tags:
+      - Moderation
+      summary: Flag details
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/flagId'
+  /moderation/flags/{flagId}/action:
+    post:
+      tags:
+      - Moderation
+      summary: Action flag
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      parameters:
+      - $ref: '#/components/parameters/flagId'
+  /moderation/videos/{videoId}/restore:
+    post:
+      tags:
+      - Moderation
+      summary: Restore video
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      parameters:
+      - $ref: '#/components/parameters/videoId'
+  /moderation/comments/{commentId}/restore:
+    post:
+      tags:
+      - Moderation
+      summary: Restore comment
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      parameters:
+      - $ref: '#/components/parameters/commentId'
+  /moderation/users:
+    get:
+      tags:
+      - Moderation
+      summary: Search users
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+  /moderation/users/{userId}/assign-moderator:
+    post:
+      tags:
+      - Moderation
+      summary: Assign moderator role
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/userId'
+  /moderation/users/{userId}/revoke-moderator:
+    post:
+      tags:
+      - Moderation
+      summary: Revoke moderator role
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - $ref: '#/components/parameters/userId'

@@ -21,7 +21,7 @@ from app.api.v1.endpoints import account_management, video_catalog, search_catal
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="KillrVideo 2025 - Monolith Backend")
+app = FastAPI(title="KillrVideo v2 - Monolith Backend")
 
 # API router for v1
 api_router_v1 = APIRouter(prefix=settings.API_V1_STR)
@@ -36,6 +36,21 @@ api_router_v1.include_router(moderation.router)
 
 app.include_router(api_router_v1)
 
+# Attempt to import httpx & httpcore connection error classes for fine-grained
+# exception handling.  They may not be present in some lightweight test
+# environments – fall back gracefully.
+
+try:
+    import httpx  # type: ignore
+    HttpxConnectError = httpx.ConnectError
+except ModuleNotFoundError:  # pragma: no cover
+    httpx = None  # type: ignore
+    HttpxConnectError = None  # type: ignore
+
+try:
+    from httpcore import ConnectError as HttpcoreConnectError  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    HttpcoreConnectError = None  # type: ignore
 
 @app.on_event("startup")
 async def startup_event():
@@ -56,9 +71,48 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+async def _problem_response(request: Request, status_code: int, detail: str):
+    """Helper to build RFC7807-style JSON error bodies."""
+
+    return JSONResponse(
+        status_code=status_code,
+        content=ProblemDetail(
+            type="about:blank",
+            title=HTTPStatus(status_code).phrase,
+            status=status_code,
+            detail=detail,
+            instance=str(request.url),
+        ).model_dump(exclude_none=True),
+    )
+
+
+if HttpxConnectError is not None:
+
+    @app.exception_handler(HttpxConnectError)  # type: ignore[arg-type]
+    async def httpx_connect_error_handler(request: Request, exc: Exception):  # noqa: D401
+        logger.warning("AstraDB connectivity problem: %s", exc)
+        return await _problem_response(
+            request,
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Unable to reach data store. Please try again later.",
+        )
+
+
+if HttpcoreConnectError is not None:
+
+    @app.exception_handler(HttpcoreConnectError)  # type: ignore[arg-type]
+    async def httpcore_connect_error_handler(request: Request, exc: Exception):  # noqa: D401
+        logger.warning("AstraDB connectivity problem: %s", exc)
+        return await _problem_response(
+            request,
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Unable to reach data store. Please try again later.",
+        )
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=ProblemDetail(

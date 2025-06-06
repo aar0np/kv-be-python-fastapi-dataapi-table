@@ -320,7 +320,7 @@ async def list_videos_with_query(
 
     docs: List[Dict[str, Any]] = []
     if hasattr(cursor, "to_list"):
-        docs = await cursor.to_list(length=page_size)
+        docs = await cursor.to_list()
     else:  # Stub collection path
         docs = cursor  # type: ignore[assignment]
 
@@ -412,7 +412,7 @@ async def record_rating(
     all_ratings_cursor = ratings_table.find(filter={"videoId": str(video_id)})
     ratings_list: List[Dict[str, Any]] = []
     if hasattr(all_ratings_cursor, "to_list"):
-        ratings_list = await all_ratings_cursor.to_list(length=None)
+        ratings_list = await all_ratings_cursor.to_list()
     else:
         ratings_list = all_ratings_cursor  # type: ignore[assignment]
 
@@ -441,7 +441,7 @@ async def get_rating_summary(
     cursor = ratings_table.find(filter={"videoId": str(video_id)})
     ratings_list: List[Dict[str, Any]] = []
     if hasattr(cursor, "to_list"):
-        ratings_list = await cursor.to_list(length=None)
+        ratings_list = await cursor.to_list()
     else:
         ratings_list = cursor  # type: ignore[assignment]
 
@@ -519,7 +519,7 @@ async def suggest_tags(
     if asyncio.iscoroutine(cursor):
         cursor = await cursor
     if hasattr(cursor, "to_list"):
-        raw_docs = await cursor.to_list(length=None)
+        raw_docs = await cursor.to_list()
     else:
         raw_docs = cursor  # type: ignore[assignment]
 

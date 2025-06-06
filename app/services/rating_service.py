@@ -24,7 +24,7 @@ async def _update_video_aggregate_rating(
     """Recalculate average and total ratings count for the given video."""
 
     cursor = ratings_db_table.find(filter={"videoId": str(video_id)}, projection={"rating": 1})
-    docs: List[Dict[str, Any]] = await cursor.to_list(length=None) if hasattr(cursor, "to_list") else cursor
+    docs: List[Dict[str, Any]] = await cursor.to_list() if hasattr(cursor, "to_list") else cursor
 
     if docs:
         values = [int(d["rating"]) for d in docs if "rating" in d]

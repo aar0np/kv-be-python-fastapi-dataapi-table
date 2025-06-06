@@ -1,4 +1,5 @@
-# KillrVideo 2025 – Python FastAPI Backend
+# KillrVideo v2 – Python FastAPI Backend
+Date: June 2025
 
 A reference backend for the KillrVideo sample application rebuilt for 2025 using **FastAPI**, **Poetry** and **DataStax Astra DB**.
 

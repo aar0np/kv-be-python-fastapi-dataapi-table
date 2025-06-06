@@ -98,7 +98,7 @@ async def list_comments_for_video(
     cursor = db_table.find(
         filter=query_filter, skip=skip, limit=page_size, sort={"createdAt": -1}
     )
-    docs = await cursor.to_list(length=page_size) if hasattr(cursor, "to_list") else cursor
+    docs = await cursor.to_list() if hasattr(cursor, "to_list") else cursor
     total = await db_table.count_documents(filter=query_filter)
     return [_doc_to_comment(d) for d in docs], total
 
@@ -115,7 +115,7 @@ async def list_comments_by_user(
     query_filter = {"userId": str(user_id)}
     skip = (page - 1) * page_size
     cursor = db_table.find(filter=query_filter, skip=skip, limit=page_size, sort={"createdAt": -1})
-    docs = await cursor.to_list(length=page_size) if hasattr(cursor, "to_list") else cursor
+    docs = await cursor.to_list() if hasattr(cursor, "to_list") else cursor
     total = await db_table.count_documents(filter=query_filter)
     return [_doc_to_comment(d) for d in docs], total
 
