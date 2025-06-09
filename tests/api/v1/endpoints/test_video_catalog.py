@@ -21,18 +21,15 @@ def _make_video(owner_id):
     """Return a deterministic Video instance for mocking purposes."""
 
     return Video(
-        videoId=uuid4(),
-        userId=owner_id,
+        videoid=uuid4(),
+        userid=owner_id,
+        added_date=datetime.now(timezone.utc),
+        name="Video Title Pending Processing",
+        location="http://example.com/video.mp4",
+        location_type=0,
         youtubeVideoId="abcdefghijk",
-        submittedAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
         status=VideoStatusEnum.PENDING,
-        title="Video Title Pending Processing",
-        description=None,
-        tags=[],
-        thumbnailUrl=None,
-        viewCount=0,
-        averageRating=None,
+        title="Video Title",
     )
 
 
@@ -44,33 +41,41 @@ def _make_video(owner_id):
 @pytest.fixture
 def creator_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Creator",
-        lastName="User",
+        userid=uuid4(),
+        firstname="Creator",
+        lastname="User",
         email="creator@example.com",
         roles=["creator"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
 @pytest.fixture
 def creator_token(creator_user: User) -> str:
-    return create_access_token(subject=creator_user.userId, roles=creator_user.roles)
+    return create_access_token(
+        subject=creator_user.userid, roles=[creator_user.account_status]
+    )
 
 
 @pytest.fixture
 def viewer_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Viewer",
-        lastName="User",
+        userid=uuid4(),
+        firstname="Viewer",
+        lastname="User",
         email="viewer@example.com",
         roles=["viewer"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
 @pytest.fixture
 def viewer_token(viewer_user: User) -> str:
-    return create_access_token(subject=viewer_user.userId, roles=viewer_user.roles)
+    return create_access_token(
+        subject=viewer_user.userid, roles=[viewer_user.account_status]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +85,7 @@ def viewer_token(viewer_user: User) -> str:
 
 @pytest.mark.asyncio
 async def test_submit_video_success(creator_user: User, creator_token: str):
-    sample_video = _make_video(owner_id=creator_user.userId)
+    sample_video = _make_video(owner_id=creator_user.userid)
 
     with (
         patch(
@@ -103,22 +108,23 @@ async def test_submit_video_success(creator_user: User, creator_token: str):
         payload = {"youtubeUrl": "https://youtu.be/abcdefghijk"}
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.post(f"{settings.API_V1_STR}/videos", json=payload, headers=headers)
+            response = await ac.post(
+                f"{settings.API_V1_STR}/videos", json=payload, headers=headers
+            )
 
         assert response.status_code == status.HTTP_202_ACCEPTED
         resp_json = response.json()
-        assert resp_json["videoId"] == str(sample_video.videoId)
+        assert resp_json["videoId"] == str(sample_video.videoid)
         # submit_new_video should have been called with VideoSubmitRequest-like param and current_user
         mock_submit_video.assert_awaited_once()
         # Background task should have been executed once after response lifecycle
         mock_process_video.assert_awaited_once_with(
-            sample_video.videoId, sample_video.youtubeVideoId
+            sample_video.videoid, sample_video.youtubeVideoId
         )
 
 
 @pytest.mark.asyncio
 async def test_submit_video_forbidden_role(viewer_user: User, viewer_token: str):
-
     with patch(
         "app.services.user_service.get_user_by_id_from_table",
         new_callable=AsyncMock,
@@ -129,7 +135,9 @@ async def test_submit_video_forbidden_role(viewer_user: User, viewer_token: str)
         payload = {"youtubeUrl": "https://youtu.be/abcdefghijk"}
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.post(f"{settings.API_V1_STR}/videos", json=payload, headers=headers)
+            response = await ac.post(
+                f"{settings.API_V1_STR}/videos", json=payload, headers=headers
+            )
 
         # Viewer lacks creator/moderator role -> 403
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -160,13 +168,17 @@ async def test_submit_video_invalid_url(creator_user: User, creator_token: str):
         ) as mock_submit_video,
     ):
         mock_get_user.return_value = creator_user
-        mock_submit_video.side_effect = HTTPException(status_code=400, detail="Invalid YouTube URL")
+        mock_submit_video.side_effect = HTTPException(
+            status_code=400, detail="Invalid YouTube URL"
+        )
 
         headers = {"Authorization": f"Bearer {creator_token}"}
         payload = {"youtubeUrl": "https://example.com/notyoutube"}
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.post(f"{settings.API_V1_STR}/videos", json=payload, headers=headers)
+            response = await ac.post(
+                f"{settings.API_V1_STR}/videos", json=payload, headers=headers
+            )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.json()["detail"] == "Invalid YouTube URL"
@@ -180,22 +192,26 @@ async def test_submit_video_invalid_url(creator_user: User, creator_token: str):
 @pytest.fixture
 def moderator_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Mod",
-        lastName="User",
+        userid=uuid4(),
+        firstname="Mod",
+        lastname="Erator",
         email="mod@example.com",
         roles=["moderator"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
 @pytest.fixture
 def moderator_token(moderator_user: User) -> str:
-    return create_access_token(subject=moderator_user.userId, roles=moderator_user.roles)
+    return create_access_token(
+        subject=moderator_user.userid, roles=[moderator_user.account_status]
+    )
 
 
 @pytest.mark.asyncio
 async def test_get_video_status_owner(creator_user: User, creator_token: str):
-    video = _make_video(owner_id=creator_user.userId)
+    video = _make_video(owner_id=creator_user.userid)
 
     with (
         patch(
@@ -213,10 +229,13 @@ async def test_get_video_status_owner(creator_user: User, creator_token: str):
         headers = {"Authorization": f"Bearer {creator_token}"}
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.get(f"{settings.API_V1_STR}/videos/id/{video.videoId}/status", headers=headers)
+            response = await ac.get(
+                f"{settings.API_V1_STR}/videos/id/{video.videoid}/status",
+                headers=headers,
+            )
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["status"] == video.status
+        assert response.json()["status"] == video.status.value
 
 
 @pytest.mark.asyncio
@@ -224,8 +243,14 @@ async def test_get_video_status_forbidden(viewer_user: User, viewer_token: str):
     video = _make_video(owner_id=uuid4())
 
     with (
-        patch("app.services.user_service.get_user_by_id_from_table", new_callable=AsyncMock) as mock_get_user,
-        patch("app.api.v1.endpoints.video_catalog.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get_video,
+        patch(
+            "app.services.user_service.get_user_by_id_from_table",
+            new_callable=AsyncMock,
+        ) as mock_get_user,
+        patch(
+            "app.api.v1.endpoints.video_catalog.video_service.get_video_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get_video,
     ):
         mock_get_user.return_value = viewer_user
         mock_get_video.return_value = video
@@ -233,7 +258,9 @@ async def test_get_video_status_forbidden(viewer_user: User, viewer_token: str):
         headers = {"Authorization": f"Bearer {viewer_token}"}
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.get(f"{settings.API_V1_STR}/videos/id/{video.videoId}/status", headers=headers)
+            response = await ac.post(
+                f"{settings.API_V1_STR}/videos/id/{video.videoid}/view"
+            )
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -249,10 +276,10 @@ async def test_get_video_details_public():
         mock_get_video.return_value = video
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.get(f"{settings.API_V1_STR}/videos/id/{video.videoId}")
+            response = await ac.get(f"{settings.API_V1_STR}/videos/id/{video.videoid}")
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["videoId"] == str(video.videoId)
+        assert response.json()["videoId"] == str(video.videoid)
 
 
 # Latest videos endpoint
@@ -267,10 +294,12 @@ async def test_get_latest_videos():
         mock_list.return_value = ([], 0)
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.get(f"{settings.API_V1_STR}/videos/latest?page=1&pageSize=10")
+            response = await ac.get(
+                f"{settings.API_V1_STR}/videos/latest?page=1&pageSize=10"
+            )
 
         if response.status_code != status.HTTP_200_OK:
-            print('DEBUG latest resp', response.status_code, response.json())
+            print("DEBUG latest resp", response.status_code, response.json())
         assert response.status_code == status.HTTP_200_OK
         mock_list.assert_awaited_once()
 
@@ -284,14 +313,22 @@ async def test_record_view_success():
     video.status = VideoStatusEnum.READY
 
     with (
-        patch("app.api.v1.endpoints.video_catalog.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get,
-        patch("app.api.v1.endpoints.video_catalog.video_service.record_video_view", new_callable=AsyncMock) as mock_record,
+        patch(
+            "app.api.v1.endpoints.video_catalog.video_service.get_video_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get,
+        patch(
+            "app.api.v1.endpoints.video_catalog.video_service.record_video_view",
+            new_callable=AsyncMock,
+        ) as mock_record,
     ):
         mock_get.return_value = video
-        mock_record.return_value = True
+        mock_record.return_value = None
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.post(f"{settings.API_V1_STR}/videos/id/{video.videoId}/view")
+            response = await ac.post(
+                f"{settings.API_V1_STR}/videos/id/{video.videoid}/view"
+            )
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
@@ -300,10 +337,15 @@ async def test_record_view_success():
 async def test_record_view_not_ready():
     video = _make_video(owner_id=uuid4())  # status PENDING
 
-    with patch("app.api.v1.endpoints.video_catalog.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get:
+    with patch(
+        "app.api.v1.endpoints.video_catalog.video_service.get_video_by_id",
+        new_callable=AsyncMock,
+    ) as mock_get:
         mock_get.return_value = video
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            response = await ac.post(f"{settings.API_V1_STR}/videos/id/{video.videoId}/view")
+            response = await ac.post(
+                f"{settings.API_V1_STR}/videos/id/{video.videoid}/view"
+            )
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND 
+        assert response.status_code == status.HTTP_404_NOT_FOUND

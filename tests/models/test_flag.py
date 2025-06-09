@@ -30,4 +30,4 @@ def test_flag_model_instantiation():
 
     # Basic assertions that the model has stored the data correctly
     assert flag.status == FlagStatusEnum.OPEN
-    assert flag.reasonText == "Unwanted content" 
+    assert flag.reasonText == "Unwanted content"

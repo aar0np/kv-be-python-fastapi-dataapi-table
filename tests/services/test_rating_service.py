@@ -12,11 +12,13 @@ from app.models.video import Video, VideoStatusEnum
 @pytest.fixture
 def viewer_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Viewer",
-        lastName="Test",
+        userid=uuid4(),
+        firstname="Viewer",
+        lastname="Test",
         email="viewer@example.com",
         roles=["viewer"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
@@ -26,24 +28,24 @@ async def test_rate_video_new(viewer_user: User):
     req = RatingCreateOrUpdateRequest(rating=4)
 
     ready_video = Video(
-        videoId=video_id,
-        userId=uuid4(),
-        youtubeVideoId="abc",
-        submittedAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
+        videoid=video_id,
+        userid=uuid4(),
+        added_date=datetime.now(timezone.utc),
+        name="Title",
+        location="http://a.b/c.mp4",
+        location_type=0,
         status=VideoStatusEnum.READY,
         title="Title",
-        description=None,
-        tags=[],
-        thumbnailUrl=None,
-        viewCount=0,
-        averageRating=None,
-        totalRatingsCount=0,
     )
 
     with (
-        patch("app.services.rating_service.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get_vid,
-        patch("app.services.rating_service.get_table", new_callable=AsyncMock) as mock_get_table,
+        patch(
+            "app.services.rating_service.video_service.get_video_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get_vid,
+        patch(
+            "app.services.rating_service.get_table", new_callable=AsyncMock
+        ) as mock_get_table,
     ):
         mock_get_vid.return_value = ready_video
         ratings_tbl = AsyncMock()
@@ -55,7 +57,9 @@ async def test_rate_video_new(viewer_user: User):
         ratings_tbl.find = MagicMock(return_value=[])
         ratings_tbl.count_documents.return_value = 0
 
-        result = await rating_service.rate_video(video_id, req, viewer_user, db_table=ratings_tbl)
+        result = await rating_service.rate_video(
+            video_id, req, viewer_user, db_table=ratings_tbl
+        )
         assert result.rating == 4
         ratings_tbl.insert_one.assert_called_once()
 
@@ -71,33 +75,36 @@ async def test_rate_video_update(viewer_user: User):
     req = RatingCreateOrUpdateRequest(rating=5)
 
     ready_video = Video(
-        videoId=video_id,
-        userId=uuid4(),
-        youtubeVideoId="abc",
-        submittedAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
+        videoid=video_id,
+        userid=uuid4(),
+        added_date=datetime.now(timezone.utc),
+        name="Title",
+        location="http://a.b/c.mp4",
+        location_type=0,
         status=VideoStatusEnum.READY,
         title="Title",
-        description=None,
-        tags=[],
-        thumbnailUrl=None,
-        viewCount=0,
-        averageRating=None,
-        totalRatingsCount=1,
     )
 
     existing_doc = {
-        "videoId": str(video_id),
-        "userId": str(viewer_user.userId),
+        "videoid": str(video_id),
+        "userid": str(viewer_user.userid),
         "rating": 3,
-        "createdAt": datetime.now(timezone.utc),
-        "updatedAt": datetime.now(timezone.utc),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
 
     with (
-        patch("app.services.rating_service.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get_vid,
-        patch("app.services.rating_service.get_table", new_callable=AsyncMock) as mock_get_table,
-        patch("app.services.rating_service._update_video_aggregate_rating", new_callable=AsyncMock) as mock_update_agg,
+        patch(
+            "app.services.rating_service.video_service.get_video_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get_vid,
+        patch(
+            "app.services.rating_service.get_table", new_callable=AsyncMock
+        ) as mock_get_table,
+        patch(
+            "app.services.rating_service._update_video_aggregate_rating",
+            new_callable=AsyncMock,
+        ) as mock_update_agg,
     ):
         mock_get_vid.return_value = ready_video
         ratings_tbl = AsyncMock()
@@ -107,7 +114,9 @@ async def test_rate_video_update(viewer_user: User):
         ratings_tbl.find_one.return_value = existing_doc
         ratings_tbl.update_one.return_value = {}
 
-        result = await rating_service.rate_video(video_id, req, viewer_user, db_table=ratings_tbl)
+        result = await rating_service.rate_video(
+            video_id, req, viewer_user, db_table=ratings_tbl
+        )
 
         ratings_tbl.update_one.assert_called_once()
         assert result.rating == req.rating
@@ -124,24 +133,26 @@ async def test_get_video_ratings_summary_with_user(viewer_user: User):
     video_id = uuid4()
 
     video_obj = Video(
-        videoId=video_id,
-        userId=uuid4(),
-        youtubeVideoId="abc",
-        submittedAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
+        videoid=video_id,
+        userid=uuid4(),
+        added_date=datetime.now(timezone.utc),
+        name="Title",
+        location="http://a.b/c.mp4",
+        location_type=0,
         status=VideoStatusEnum.READY,
         title="Title",
-        description=None,
-        tags=[],
-        thumbnailUrl=None,
-        viewCount=0,
         averageRating=4.5,
         totalRatingsCount=2,
     )
 
     with (
-        patch("app.services.rating_service.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get_vid,
-        patch("app.services.rating_service.get_table", new_callable=AsyncMock) as mock_get_table,
+        patch(
+            "app.services.rating_service.video_service.get_video_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get_vid,
+        patch(
+            "app.services.rating_service.get_table", new_callable=AsyncMock
+        ) as mock_get_table,
     ):
         mock_get_vid.return_value = video_obj
         ratings_tbl = AsyncMock()
@@ -149,9 +160,9 @@ async def test_get_video_ratings_summary_with_user(viewer_user: User):
         ratings_tbl.find_one.return_value = {"rating": 5}
 
         summary = await rating_service.get_video_ratings_summary(
-            video_id, current_user_id=viewer_user.userId, ratings_db_table=ratings_tbl
+            video_id, current_user_id=viewer_user.userid, ratings_db_table=ratings_tbl
         )
 
         assert summary.averageRating == 4.5
         assert summary.totalRatingsCount == 2
-        assert summary.currentUserRating == 5 
+        assert summary.currentUserRating == 5

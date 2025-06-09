@@ -28,4 +28,4 @@ async def test_get_video_details_other_id():
     details = await svc.get_video_details(random_id)
 
     assert details is not None
-    assert details["title"].startswith("Generic Video") 
+    assert details["title"].startswith("Generic Video")

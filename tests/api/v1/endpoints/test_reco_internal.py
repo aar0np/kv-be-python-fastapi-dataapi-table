@@ -3,6 +3,7 @@ from httpx import AsyncClient
 from fastapi import status
 from uuid import uuid4
 from unittest.mock import AsyncMock, patch
+from datetime import datetime, timezone
 
 from app.main import app
 from app.core.config import settings
@@ -14,46 +15,57 @@ from app.models.user import User
 @pytest.fixture
 def creator_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Creator",
-        lastName="User",
+        userid=uuid4(),
+        firstname="Creator",
+        lastname="User",
         email="creator@example.com",
         roles=["creator"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
 @pytest.fixture
 def creator_token(creator_user: User) -> str:
-    return create_access_token(subject=creator_user.userId, roles=creator_user.roles)
+    return create_access_token(
+        subject=creator_user.userid, roles=[creator_user.account_status]
+    )
 
 
 @pytest.fixture
 def viewer_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Viewer",
-        lastName="User",
+        userid=uuid4(),
+        firstname="Viewer",
+        lastname="User",
         email="viewer@example.com",
         roles=["viewer"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
 @pytest.fixture
 def viewer_token(viewer_user: User) -> str:
-    return create_access_token(subject=viewer_user.userId, roles=viewer_user.roles)
+    return create_access_token(
+        subject=viewer_user.userid, roles=[viewer_user.account_status]
+    )
 
 
 @pytest.mark.asyncio
 async def test_ingest_embedding_success(creator_user: User, creator_token: str):
     video_id = uuid4()
 
-    with patch(
-        "app.api.v1.endpoints.reco_internal.recommendation_service.ingest_video_embedding",
-        new_callable=AsyncMock,
-    ) as mock_service, patch(
-        "app.services.user_service.get_user_by_id_from_table",
-        new_callable=AsyncMock,
-    ) as mock_get_user:
+    with (
+        patch(
+            "app.api.v1.endpoints.reco_internal.recommendation_service.ingest_video_embedding",
+            new_callable=AsyncMock,
+        ) as mock_service,
+        patch(
+            "app.services.user_service.get_user_by_id_from_table",
+            new_callable=AsyncMock,
+        ) as mock_get_user,
+    ):
         mock_service.return_value = EmbeddingIngestResponse(
             videoId=video_id,
             status="received_stub",
@@ -65,7 +77,9 @@ async def test_ingest_embedding_success(creator_user: User, creator_token: str):
         payload = {"videoId": str(video_id), "vector": [0.1, 0.2, 0.3]}
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            resp = await ac.post(f"{settings.API_V1_STR}/reco/ingest", json=payload, headers=headers)
+            resp = await ac.post(
+                f"{settings.API_V1_STR}/reco/ingest", json=payload, headers=headers
+            )
 
         assert resp.status_code == status.HTTP_202_ACCEPTED
         mock_service.assert_awaited_once()
@@ -75,13 +89,16 @@ async def test_ingest_embedding_success(creator_user: User, creator_token: str):
 async def test_ingest_embedding_video_not_found(creator_user: User, creator_token: str):
     video_id = uuid4()
 
-    with patch(
-        "app.api.v1.endpoints.reco_internal.recommendation_service.ingest_video_embedding",
-        new_callable=AsyncMock,
-    ) as mock_service, patch(
-        "app.services.user_service.get_user_by_id_from_table",
-        new_callable=AsyncMock,
-    ) as mock_get_user:
+    with (
+        patch(
+            "app.api.v1.endpoints.reco_internal.recommendation_service.ingest_video_embedding",
+            new_callable=AsyncMock,
+        ) as mock_service,
+        patch(
+            "app.services.user_service.get_user_by_id_from_table",
+            new_callable=AsyncMock,
+        ) as mock_get_user,
+    ):
         mock_service.return_value = EmbeddingIngestResponse(
             videoId=video_id,
             status="error",
@@ -93,7 +110,9 @@ async def test_ingest_embedding_video_not_found(creator_user: User, creator_toke
         payload = {"videoId": str(video_id), "vector": [0.1]}
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            resp = await ac.post(f"{settings.API_V1_STR}/reco/ingest", json=payload, headers=headers)
+            resp = await ac.post(
+                f"{settings.API_V1_STR}/reco/ingest", json=payload, headers=headers
+            )
 
         assert resp.status_code == status.HTTP_404_NOT_FOUND
 
@@ -112,6 +131,8 @@ async def test_ingest_embedding_requires_creator(viewer_user: User, viewer_token
         payload = {"videoId": str(video_id), "vector": [0.1]}
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            resp = await ac.post(f"{settings.API_V1_STR}/reco/ingest", json=payload, headers=headers)
+            resp = await ac.post(
+                f"{settings.API_V1_STR}/reco/ingest", json=payload, headers=headers
+            )
 
-        assert resp.status_code == status.HTTP_403_FORBIDDEN 
+        assert resp.status_code == status.HTTP_403_FORBIDDEN

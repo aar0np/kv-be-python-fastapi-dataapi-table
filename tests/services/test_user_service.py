@@ -11,20 +11,20 @@ from app.models.user import UserCreateRequest, User, UserProfileUpdateRequest
 @pytest.fixture
 def sample_user_create_request() -> UserCreateRequest:
     return UserCreateRequest(
-        firstName="Test",
-        lastName="User",
+        firstname="Test",
+        lastname="User",
         email=f"testuser_{uuid4()}@example.com",  # Ensure unique email
         password="securepassword123",
     )
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_email_from_table_found():
+async def test_get_user_by_email_from_credentials_table_found():
     mock_db_table = AsyncMock()
-    expected_user_doc = {"email": "found@example.com", "firstName": "Found"}
+    expected_user_doc = {"email": "found@example.com", "firstname": "Found"}
     mock_db_table.find_one.return_value = expected_user_doc
 
-    user_doc = await user_service.get_user_by_email_from_table(
+    user_doc = await user_service.get_user_by_email_from_credentials_table(
         email="found@example.com", db_table=mock_db_table
     )
 
@@ -35,11 +35,11 @@ async def test_get_user_by_email_from_table_found():
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_email_from_table_not_found():
+async def test_get_user_by_email_from_credentials_table_not_found():
     mock_db_table = AsyncMock()
     mock_db_table.find_one.return_value = None  # Simulate user not found
 
-    user_doc = await user_service.get_user_by_email_from_table(
+    user_doc = await user_service.get_user_by_email_from_credentials_table(
         email="notfound@example.com", db_table=mock_db_table
     )
 
@@ -51,49 +51,52 @@ async def test_get_user_by_email_from_table_not_found():
 
 @pytest.mark.asyncio
 async def test_create_user_in_table(sample_user_create_request: UserCreateRequest):
-    mock_db_table = AsyncMock()
-    # Mock insert_one to simulate successful insertion by AstraDB
-    # AstraDB insert_one typically returns a dict like {"insertedIds": ["some_id"]}
-    # For this test, we only care that it's called and what it's called with.
-    # The service function returns the input document, so we don't need to mock a specific return value for insert_one here for that part.
-    mock_db_table.insert_one.return_value = MagicMock(inserted_id=str(uuid4()))
+    mock_users_table = AsyncMock()
+    mock_credentials_table = AsyncMock()
 
-    with patch("app.services.user_service.get_password_hash") as mock_get_password_hash:
+    with patch(
+        "app.services.user_service.get_password_hash"
+    ) as mock_get_password_hash:
         mock_hashed_password = "hashed_secure_password"
         mock_get_password_hash.return_value = mock_hashed_password
 
-        # Patch uuid4 to control the generated userid for assertion
         test_user_id = uuid4()
         with patch("app.services.user_service.uuid4") as mock_uuid4:
             mock_uuid4.return_value = test_user_id
 
             created_user_doc = await user_service.create_user_in_table(
-                user_in=sample_user_create_request, db_table=mock_db_table
+                user_in=sample_user_create_request,
+                users_table=mock_users_table,
+                credentials_table=mock_credentials_table,
             )
 
             mock_get_password_hash.assert_called_once_with(
                 sample_user_create_request.password
             )
-            mock_db_table.insert_one.assert_called_once()
+            mock_users_table.insert_one.assert_called_once()
+            mock_credentials_table.insert_one.assert_called_once()
 
-            # Check the document structure passed to insert_one
-            args, kwargs = mock_db_table.insert_one.call_args
-            inserted_document = kwargs.get("document")
+            # Check the user document
+            args, kwargs = mock_users_table.insert_one.call_args
+            user_document = kwargs.get("document")
+            assert user_document is not None
+            assert user_document["userid"] == test_user_id
+            assert user_document["firstname"] == sample_user_create_request.firstname
+            assert user_document["lastname"] == sample_user_create_request.lastname
+            assert user_document["email"] == sample_user_create_request.email
+            assert user_document["account_status"] == "active"
 
-            assert inserted_document is not None
-            assert inserted_document["userid"] == str(test_user_id)
-            assert (
-                inserted_document["firstName"] == sample_user_create_request.firstName
-            )
-            assert inserted_document["lastName"] == sample_user_create_request.lastName
-            assert inserted_document["email"] == sample_user_create_request.email
-            assert inserted_document["hashed_password"] == mock_hashed_password
-            assert inserted_document["roles"] == ["viewer"]
-            assert isinstance(inserted_document["created_at"], datetime)
-            assert inserted_document["created_at"].tzinfo == timezone.utc
+            # Check the credentials document
+            args, kwargs = mock_credentials_table.insert_one.call_args
+            credentials_document = kwargs.get("document")
+            assert credentials_document is not None
+            assert credentials_document["email"] == sample_user_create_request.email
+            assert credentials_document["password"] == mock_hashed_password
+            assert credentials_document["userid"] == test_user_id
+            assert not credentials_document["account_locked"]
 
-            # Verify the returned document is what we expect (the one passed to insert_one)
-            assert created_user_doc == inserted_document
+            # Verify the returned document
+            assert created_user_doc["userid"] == test_user_id
 
 
 @pytest.mark.asyncio
@@ -103,18 +106,19 @@ async def test_create_user_in_table_uses_get_table_if_no_db_table_provided(
     with patch(
         "app.services.user_service.get_table", new_callable=AsyncMock
     ) as mock_get_table:
-        mock_actual_db_table = AsyncMock()
-        mock_get_table.return_value = mock_actual_db_table
-        mock_actual_db_table.insert_one.return_value = MagicMock(
-            inserted_id=str(uuid4())
-        )
+        mock_users_table = AsyncMock()
+        mock_credentials_table = AsyncMock()
+        mock_get_table.side_effect = [mock_users_table, mock_credentials_table]
 
         with patch(
             "app.services.user_service.get_password_hash", return_value="hashed"
         ):
             await user_service.create_user_in_table(user_in=sample_user_create_request)
-            mock_get_table.assert_called_once_with(user_service.USERS_TABLE_NAME)
-            mock_actual_db_table.insert_one.assert_called_once()
+            assert mock_get_table.call_count == 2
+            mock_get_table.assert_any_call(user_service.USERS_TABLE_NAME)
+            mock_get_table.assert_any_call(user_service.USER_CREDENTIALS_TABLE_NAME)
+            mock_users_table.insert_one.assert_called_once()
+            mock_credentials_table.insert_one.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -126,8 +130,12 @@ async def test_get_user_by_email_uses_get_table_if_no_db_table_provided():
         mock_get_table.return_value = mock_actual_db_table
         mock_actual_db_table.find_one.return_value = None  # Example return
 
-        await user_service.get_user_by_email_from_table(email="some@email.com")
-        mock_get_table.assert_called_once_with(user_service.USERS_TABLE_NAME)
+        await user_service.get_user_by_email_from_credentials_table(
+            email="some@email.com"
+        )
+        mock_get_table.assert_called_once_with(
+            user_service.USER_CREDENTIALS_TABLE_NAME
+        )
         mock_actual_db_table.find_one.assert_called_once_with(
             filter={"email": "some@email.com"}
         )
@@ -139,23 +147,35 @@ async def test_authenticate_user_from_table_success():
     email = "test@example.com"
     password = "correctpassword"
     user_id = uuid4()
-    db_user_doc = {
-        "userid": str(user_id),
-        "firstName": "Test",
-        "lastName": "User",
+    credentials_doc = {
         "email": email,
-        "hashed_password": "hashed_correct_password",  # Assume this is the hash of "correctpassword"
-        "roles": ["viewer"],
+        "password": "hashed_correct_password",
+        "userid": user_id,
+        "account_locked": False,
+    }
+    user_doc = {
+        "userid": user_id,
+        "firstname": "Test",
+        "lastname": "User",
+        "email": email,
+        "created_date": datetime.now(timezone.utc),
+        "account_status": "active",
     }
 
     with (
         patch(
-            "app.services.user_service.get_user_by_email_from_table",
+            "app.services.user_service.get_table",
             new_callable=AsyncMock,
-        ) as mock_get_user_by_email,
-        patch("app.services.user_service.verify_password") as mock_verify_password,
+        ) as mock_get_table,
+        patch(
+            "app.services.user_service.verify_password"
+        ) as mock_verify_password,
     ):
-        mock_get_user_by_email.return_value = db_user_doc
+        mock_credentials_table = AsyncMock()
+        mock_users_table = AsyncMock()
+        mock_get_table.side_effect = [mock_credentials_table, mock_users_table]
+        mock_credentials_table.find_one.return_value = credentials_doc
+        mock_users_table.find_one.return_value = user_doc
         mock_verify_password.return_value = True
 
         authenticated_user = await user_service.authenticate_user_from_table(
@@ -164,10 +184,8 @@ async def test_authenticate_user_from_table_success():
 
         assert authenticated_user is not None
         assert isinstance(authenticated_user, User)
-        assert authenticated_user.userId == user_id
+        assert authenticated_user.userid == user_id
         assert authenticated_user.email == email
-        assert authenticated_user.roles == ["viewer"]
-        mock_get_user_by_email.assert_called_once_with(email, None)  # None for db_table
         mock_verify_password.assert_called_once_with(
             password, "hashed_correct_password"
         )
@@ -179,16 +197,17 @@ async def test_authenticate_user_from_table_user_not_found():
     password = "anypassword"
 
     with patch(
-        "app.services.user_service.get_user_by_email_from_table", new_callable=AsyncMock
-    ) as mock_get_user_by_email:
-        mock_get_user_by_email.return_value = None  # Simulate user not found
+        "app.services.user_service.get_table", new_callable=AsyncMock
+    ) as mock_get_table:
+        mock_credentials_table = AsyncMock()
+        mock_get_table.return_value = mock_credentials_table
+        mock_credentials_table.find_one.return_value = None
 
         authenticated_user = await user_service.authenticate_user_from_table(
             email, password
         )
 
         assert authenticated_user is None
-        mock_get_user_by_email.assert_called_once_with(email, None)
 
 
 @pytest.mark.asyncio
@@ -196,31 +215,32 @@ async def test_authenticate_user_from_table_incorrect_password():
     email = "test@example.com"
     password = "incorrectpassword"
     user_id = uuid4()
-    db_user_doc = {
-        "userid": str(user_id),
-        "firstName": "Test",
-        "lastName": "User",
+    credentials_doc = {
         "email": email,
-        "hashed_password": "hashed_correct_password",
-        "roles": ["viewer"],
+        "password": "hashed_correct_password",
+        "userid": user_id,
+        "account_locked": False,
     }
 
     with (
         patch(
-            "app.services.user_service.get_user_by_email_from_table",
+            "app.services.user_service.get_table",
             new_callable=AsyncMock,
-        ) as mock_get_user_by_email,
-        patch("app.services.user_service.verify_password") as mock_verify_password,
+        ) as mock_get_table,
+        patch(
+            "app.services.user_service.verify_password"
+        ) as mock_verify_password,
     ):
-        mock_get_user_by_email.return_value = db_user_doc
-        mock_verify_password.return_value = False  # Simulate incorrect password
+        mock_credentials_table = AsyncMock()
+        mock_get_table.return_value = mock_credentials_table
+        mock_credentials_table.find_one.return_value = credentials_doc
+        mock_verify_password.return_value = False
 
         authenticated_user = await user_service.authenticate_user_from_table(
             email, password
         )
 
         assert authenticated_user is None
-        mock_get_user_by_email.assert_called_once_with(email, None)
         mock_verify_password.assert_called_once_with(
             password, "hashed_correct_password"
         )
@@ -231,165 +251,107 @@ async def test_authenticate_user_from_table_incorrect_password():
 async def test_update_user_in_table_success():
     user_id = uuid4()
     update_request = UserProfileUpdateRequest(
-        firstName="UpdatedFirstName", lastName="UpdatedLastName"
+        firstname="UpdatedFirstName", lastname="UpdatedLastName"
     )
 
-    original_user_doc = {
-        "userid": str(user_id),
-        "firstName": "OriginalFirst",
-        "lastName": "OriginalLast",
-        "email": "test@example.com",
-        "hashed_password": "somehash",
-        "roles": ["viewer"],
-    }
-    # This is what we expect find_one to return *after* the update
     expected_updated_user_doc = {
-        "userid": str(user_id),
-        "firstName": "UpdatedFirstName",  # Updated
-        "lastName": "UpdatedLastName",  # Updated
-        "email": "test@example.com",  # Unchanged
-        "hashed_password": "somehash",  # Unchanged
-        "roles": ["viewer"],  # Unchanged
+        "userid": user_id,
+        "firstname": "UpdatedFirstName",
+        "lastname": "UpdatedLastName",
+        "email": "test@example.com",
+        "created_date": datetime.now(timezone.utc),
+        "account_status": "active",
     }
 
     mock_db_table = AsyncMock()
-    # find_one will be called twice: first to check existence, second to get updated doc
-    mock_db_table.find_one.side_effect = [original_user_doc, expected_updated_user_doc]
-    mock_db_table.update_one.return_value = (
-        MagicMock()
-    )  # Assume update_one returns some result object
+    mock_db_table.find_one.return_value = expected_updated_user_doc
+    mock_db_table.update_one.return_value = MagicMock()
 
     updated_user = await user_service.update_user_in_table(
         user_id=user_id, update_data=update_request, db_table=mock_db_table
     )
 
     assert updated_user is not None
-    assert updated_user.firstName == "UpdatedFirstName"
-    assert updated_user.lastName == "UpdatedLastName"
+    assert updated_user.firstname == "UpdatedFirstName"
+    assert updated_user.lastname == "UpdatedLastName"
     assert updated_user.email == "test@example.com"
-    assert updated_user.userId == user_id
+    assert updated_user.userid == user_id
 
-    assert mock_db_table.find_one.call_count == 2
-    mock_db_table.find_one.assert_any_call(filter={"userid": str(user_id)})
     mock_db_table.update_one.assert_called_once_with(
-        filter={"userid": str(user_id)},
-        update={
-            "$set": {"firstName": "UpdatedFirstName", "lastName": "UpdatedLastName"}
-        },
+        filter={"userid": user_id},
+        update={"$set": {"firstname": "UpdatedFirstName", "lastname": "UpdatedLastName"}},
     )
 
 
 @pytest.mark.asyncio
 async def test_update_user_in_table_no_fields_to_update():
     user_id = uuid4()
-    update_request = UserProfileUpdateRequest()  # Empty update request
+    update_request = UserProfileUpdateRequest()
 
     original_user_doc = {
-        "userid": str(user_id),
-        "firstName": "OriginalFirst",
-        "lastName": "OriginalLast",
+        "userid": user_id,
+        "firstname": "OriginalFirst",
+        "lastname": "OriginalLast",
         "email": "test@example.com",
-        "roles": ["viewer"],
+        "created_date": datetime.now(timezone.utc),
+        "account_status": "active",
+        "last_login_date": None,
     }
 
     mock_db_table = AsyncMock()
-    mock_db_table.find_one.return_value = original_user_doc  # find_one called once
+    mock_db_table.find_one.return_value = original_user_doc
 
-    updated_user = await user_service.update_user_in_table(
-        user_id=user_id, update_data=update_request, db_table=mock_db_table
-    )
+    with patch(
+        "app.services.user_service.get_user_by_id_from_table",
+        new_callable=AsyncMock,
+    ) as mock_get_user_by_id:
+        mock_get_user_by_id.return_value = User.model_validate(original_user_doc)
 
-    assert updated_user is not None
-    assert updated_user.firstName == "OriginalFirst"
-    assert updated_user.lastName == "OriginalLast"
-    mock_db_table.find_one.assert_called_once_with(filter={"userid": str(user_id)})
-    mock_db_table.update_one.assert_not_called()  # update_one should not be called
+        updated_user = await user_service.update_user_in_table(
+            user_id=user_id, update_data=update_request, db_table=mock_db_table
+        )
+
+        assert updated_user is not None
+        assert updated_user.firstname == "OriginalFirst"
+        assert updated_user.lastname == "OriginalLast"
+        mock_db_table.update_one.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_update_user_in_table_user_not_found_initially():
     user_id = uuid4()
-    update_request = UserProfileUpdateRequest(firstName="UpdatedName")
+    update_request = UserProfileUpdateRequest(firstname="UpdatedName")
 
     mock_db_table = AsyncMock()
-    mock_db_table.find_one.return_value = None  # Simulate user not found on first call
+    mock_db_table.find_one.return_value = None
 
     updated_user = await user_service.update_user_in_table(
         user_id=user_id, update_data=update_request, db_table=mock_db_table
     )
 
     assert updated_user is None
-    mock_db_table.find_one.assert_called_once_with(filter={"userid": str(user_id)})
-    mock_db_table.update_one.assert_not_called()
-
-
-# --- Tests for role assignment and revocation ---
-
-@pytest.mark.asyncio
-async def test_assign_role_to_user_adds_role():
-    user_id = uuid4()
-    initial_doc = {
-        "userid": str(user_id),
-        "firstName": "First",
-        "lastName": "Last",
-        "email": "a@b.com",
-        "roles": ["viewer"],
-    }
-    updated_doc = {**initial_doc, "roles": ["viewer", "moderator"]}
-
-    mock_db = AsyncMock()
-    mock_db.find_one.side_effect = [initial_doc, updated_doc]
-    mock_db.update_one.return_value = MagicMock()
-
-    updated_user = await user_service.assign_role_to_user(
-        user_to_modify_id=user_id, role_to_assign="moderator", db_table=mock_db
+    mock_db_table.update_one.assert_called_once_with(
+        filter={"userid": user_id}, update={"$set": {"firstname": "UpdatedName"}}
     )
-
-    # Ensure update_one called with roles plus moderator
-    mock_db.update_one.assert_called_once_with(
-        filter={"userid": str(user_id)}, update={"$set": {"roles": ["viewer", "moderator"]}}
-    )
-    assert updated_user is not None and "moderator" in updated_user.roles
-
-
-@pytest.mark.asyncio
-async def test_revoke_role_from_user_removes_role():
-    user_id = uuid4()
-    initial_doc = {
-        "userid": str(user_id),
-        "firstName": "First",
-        "lastName": "Last",
-        "email": "a@b.com",
-        "roles": ["viewer", "moderator"],
-    }
-    updated_doc = {**initial_doc, "roles": ["viewer"]}
-
-    mock_db = AsyncMock()
-    mock_db.find_one.side_effect = [initial_doc, updated_doc]
-    mock_db.update_one.return_value = MagicMock()
-
-    updated_user = await user_service.revoke_role_from_user(
-        user_to_modify_id=user_id, role_to_revoke="moderator", db_table=mock_db
-    )
-
-    mock_db.update_one.assert_called_once_with(
-        filter={"userid": str(user_id)}, update={"$set": {"roles": ["viewer"]}}
-    )
-    assert updated_user is not None and "moderator" not in updated_user.roles
+    mock_db_table.find_one.assert_called_once_with(filter={"userid": user_id})
 
 
 @pytest.mark.asyncio
 async def test_search_users_with_query():
     doc = {
-        "userid": str(uuid4()),
-        "firstName": "Alice",
-        "lastName": "Smith",
+        "userid": uuid4(),
+        "firstname": "Alice",
+        "lastname": "Smith",
         "email": "alice@example.com",
-        "roles": ["viewer"],
+        "created_date": datetime.now(timezone.utc),
+        "account_status": "active",
+        "last_login_date": None,
     }
 
     mock_db = AsyncMock()
-    mock_db.find = MagicMock(return_value=[doc])
+    mock_cursor = AsyncMock()
+    mock_cursor.to_list.return_value = [doc]
+    mock_db.find.return_value = mock_cursor
 
     results = await user_service.search_users(query="alice", db_table=mock_db)
 
@@ -400,7 +362,9 @@ async def test_search_users_with_query():
 @pytest.mark.asyncio
 async def test_search_users_no_query():
     mock_db = AsyncMock()
-    mock_db.find = MagicMock(return_value=[])
+    mock_cursor = AsyncMock()
+    mock_cursor.to_list.return_value = []
+    mock_db.find.return_value = mock_cursor
 
     results = await user_service.search_users(db_table=mock_db)
     mock_db.find.assert_called_once()

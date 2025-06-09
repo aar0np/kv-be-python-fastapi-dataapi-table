@@ -128,13 +128,16 @@ async def test_post_rating_success(viewer_user: User, viewer_token: str):
         updatedAt=datetime.now(timezone.utc),
     )
 
-    with patch(
-        "app.api.v1.endpoints.comments_ratings.rating_service.rate_video",
-        new_callable=AsyncMock,
-    ) as mock_rate, patch(
-        "app.services.user_service.get_user_by_id_from_table",
-        new_callable=AsyncMock,
-    ) as mock_get_user:
+    with (
+        patch(
+            "app.api.v1.endpoints.comments_ratings.rating_service.rate_video",
+            new_callable=AsyncMock,
+        ) as mock_rate,
+        patch(
+            "app.services.user_service.get_user_by_id_from_table",
+            new_callable=AsyncMock,
+        ) as mock_get_user,
+    ):
         mock_rate.return_value = sample_rating
         mock_get_user.return_value = viewer_user
 
@@ -186,4 +189,4 @@ async def test_get_rating_summary_public():
             resp = await ac.get(f"{settings.API_V1_STR}/videos/{video_id}/ratings")
 
         assert resp.status_code == status.HTTP_200_OK
-        mock_get.assert_awaited_once() 
+        mock_get.assert_awaited_once()

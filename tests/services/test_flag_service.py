@@ -4,7 +4,13 @@ from uuid import uuid4, UUID
 from datetime import datetime, timezone
 
 from app.services import flag_service
-from app.models.flag import ContentTypeEnum, FlagCreateRequest, FlagReasonCodeEnum, FlagStatusEnum, Flag
+from app.models.flag import (
+    ContentTypeEnum,
+    FlagCreateRequest,
+    FlagReasonCodeEnum,
+    FlagStatusEnum,
+    Flag,
+)
 from app.models.user import User
 from app.models.video import Video, VideoStatusEnum
 
@@ -12,11 +18,13 @@ from app.models.video import Video, VideoStatusEnum
 @pytest.fixture
 def viewer_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Flag",
-        lastName="Tester",
+        userid=uuid4(),
+        firstname="Flag",
+        lastname="Tester",
         email="flag@example.com",
         roles=["viewer"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
@@ -25,18 +33,14 @@ async def test_create_flag_video_success(viewer_user: User):
     video_id = uuid4()
 
     ready_video = Video(
-        videoId=video_id,
-        userId=uuid4(),
-        youtubeVideoId="abc",
-        submittedAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
+        videoid=video_id,
+        userid=uuid4(),
+        added_date=datetime.now(timezone.utc),
+        name="Title",
+        location="http://a.b/c.mp4",
+        location_type=0,
         status=VideoStatusEnum.READY,
         title="Title",
-        description=None,
-        tags=[],
-        thumbnailUrl=None,
-        viewCount=0,
-        averageRating=None,
     )
 
     flag_request = FlagCreateRequest(
@@ -47,9 +51,17 @@ async def test_create_flag_video_success(viewer_user: User):
     )
 
     with (
-        patch("app.services.flag_service.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get_video,
-        patch("app.services.flag_service.comment_service.get_comment_by_id", new_callable=AsyncMock) as mock_get_comment,
-        patch("app.services.flag_service.get_table", new_callable=AsyncMock) as mock_get_table,
+        patch(
+            "app.services.flag_service.video_service.get_video_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get_video,
+        patch(
+            "app.services.flag_service.comment_service.get_comment_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get_comment,
+        patch(
+            "app.services.flag_service.get_table", new_callable=AsyncMock
+        ) as mock_get_table,
     ):
         mock_get_video.return_value = ready_video
         mock_get_comment.return_value = None
@@ -68,28 +80,35 @@ async def test_create_flag_video_success(viewer_user: User):
 
 @pytest.mark.asyncio
 async def test_create_flag_content_not_found(viewer_user: User):
-    comment_id = uuid4()
-
+    video_id = uuid4()
     flag_request = FlagCreateRequest(
-        contentType=ContentTypeEnum.COMMENT,
-        contentId=comment_id,
+        contentType=ContentTypeEnum.VIDEO,
+        contentId=video_id,
         reasonCode=FlagReasonCodeEnum.SPAM,
     )
 
     with (
-        patch("app.services.flag_service.comment_service.get_comment_by_id", new_callable=AsyncMock) as mock_get_comment,
-        patch("app.services.flag_service.get_table", new_callable=AsyncMock) as mock_get_table,
+        patch(
+            "app.services.flag_service.video_service.get_video_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get_video,
+        patch(
+            "app.services.flag_service.get_table", new_callable=AsyncMock
+        ) as mock_get_table,
     ):
-        mock_get_comment.return_value = None  # comment not found
+        mock_get_video.return_value = None
         mock_get_table.return_value = AsyncMock()
 
         with pytest.raises(flag_service.HTTPException) as exc_info:
-            await flag_service.create_flag(request=flag_request, current_user=viewer_user)
+            await flag_service.create_flag(
+                request=flag_request, current_user=viewer_user
+            )
 
-        assert exc_info.value.status_code == 404 
+        assert exc_info.value.status_code == 404
 
 
 # --- Additional tests for list/get/action ---
+
 
 @pytest.mark.asyncio
 async def test_list_flags_with_status_filter():
@@ -105,7 +124,7 @@ async def test_list_flags_with_status_filter():
     }
 
     mock_db = AsyncMock()
-    mock_db.find = MagicMock(return_value=[sample_flag_doc])
+    mock_db.find.return_value = [sample_flag_doc]
     mock_db.count_documents.return_value = 1
 
     flags, total = await flag_service.list_flags(
@@ -113,7 +132,11 @@ async def test_list_flags_with_status_filter():
     )
 
     mock_db.find.assert_called_once()
-    assert total == 1 and len(flags) == 1 and flags[0].flagId == UUID(sample_flag_doc["flagId"])
+    assert (
+        total == 1
+        and len(flags) == 1
+        and flags[0].flagId == UUID(sample_flag_doc["flagId"])
+    )
 
 
 @pytest.mark.asyncio
@@ -154,11 +177,13 @@ async def test_action_on_flag_updates_status():
     )
 
     moderator_user = User(
-        userId=uuid4(),
-        firstName="Mod",
-        lastName="Erator",
+        userid=uuid4(),
+        firstname="Mod",
+        lastname="Erator",
         email="mod@example.com",
         roles=["moderator"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
     mock_db = AsyncMock()
@@ -174,4 +199,4 @@ async def test_action_on_flag_updates_status():
 
     mock_db.update_one.assert_called_once()
     assert updated_flag.status == FlagStatusEnum.APPROVED
-    assert updated_flag.moderatorId == moderator_user.userId 
+    assert updated_flag.moderatorId == moderator_user.userid

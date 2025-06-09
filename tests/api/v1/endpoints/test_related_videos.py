@@ -14,8 +14,12 @@ async def test_get_related_videos_endpoint():
     video_id = uuid4()
 
     dummy_items = [
-        RecommendationItem(videoId=uuid4(), title="Video 1", thumbnailUrl=None, score=0.9),
-        RecommendationItem(videoId=uuid4(), title="Video 2", thumbnailUrl=None, score=0.8),
+        RecommendationItem(
+            videoId=uuid4(), title="Video 1", thumbnailUrl=None, score=0.9
+        ),
+        RecommendationItem(
+            videoId=uuid4(), title="Video 2", thumbnailUrl=None, score=0.8
+        ),
     ]
 
     with patch(
@@ -31,7 +35,9 @@ async def test_get_related_videos_endpoint():
 
         assert response.status_code == status.HTTP_200_OK
         # FastAPI JSON serialises UUIDs as strings, so normalise our expected payload.
-        expected = [dict(item.model_dump(), videoId=str(item.videoId)) for item in dummy_items]
+        expected = [
+            dict(item.model_dump(), videoId=str(item.videoId)) for item in dummy_items
+        ]
         assert response.json() == expected
 
-        mock_service.assert_awaited_once_with(video_id=video_id, limit=2) 
+        mock_service.assert_awaited_once_with(video_id=video_id, limit=2)

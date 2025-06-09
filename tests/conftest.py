@@ -1,4 +1,5 @@
 """Test configuration and stubs for external libraries."""
+
 import sys
 import types
 
@@ -31,7 +32,7 @@ if "astrapy" not in sys.modules:  # pragma: no cover
 
     astrapy_stub.db = db_stub  # type: ignore[attr-defined]
     sys.modules["astrapy"] = astrapy_stub
-    sys.modules["astrapy.db"] = db_stub 
+    sys.modules["astrapy.db"] = db_stub
 
 # ---------------------------------------------------------------------------
 # Patch httpx.AsyncClient to accept `app` kwarg using ASGITransport (for tests)
@@ -49,4 +50,4 @@ try:
     httpx.AsyncClient = _PatchedAsyncClient  # type: ignore
     sys.modules["httpx"].AsyncClient = _PatchedAsyncClient  # type: ignore
 except ImportError:  # pragma: no cover
-    pass 
+    pass

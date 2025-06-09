@@ -30,7 +30,8 @@ async def test_search_videos_success():
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
             resp = await ac.get(
-                f"{settings.API_V1_STR}/search/videos", params={"query": "test", "page": 1, "pageSize": 10}
+                f"{settings.API_V1_STR}/search/videos",
+                params={"query": "test", "page": 1, "pageSize": 10},
             )
 
         assert resp.status_code == status.HTTP_200_OK
@@ -54,7 +55,8 @@ async def test_tag_suggestions_success():
         mock_suggest.return_value = suggestions
         async with AsyncClient(app=app, base_url="http://test") as ac:
             resp = await ac.get(
-                f"{settings.API_V1_STR}/search/tags/suggest", params={"query": "py", "limit": 5}
+                f"{settings.API_V1_STR}/search/tags/suggest",
+                params={"query": "py", "limit": 5},
             )
         assert resp.status_code == status.HTTP_200_OK
         assert len(resp.json()) == 2
@@ -65,4 +67,4 @@ async def test_tag_suggestions_success():
 async def test_tag_suggestions_missing_query():
     async with AsyncClient(app=app, base_url="http://test") as ac:
         resp = await ac.get(f"{settings.API_V1_STR}/search/tags/suggest")
-    assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY 
+    assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY

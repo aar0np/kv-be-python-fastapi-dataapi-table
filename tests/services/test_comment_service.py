@@ -1,95 +1,88 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from uuid import uuid4
+from uuid import uuid4, UUID
 from datetime import datetime, timezone
 
 from app.services import comment_service
-from app.models.comment import CommentCreateRequest
+from app.models.comment import CommentCreateRequest, Comment
 from app.models.user import User
-from app.models.video import Video, VideoStatusEnum
-
-
-@pytest.mark.asyncio
-async def test_determine_sentiment_returns_valid_option():
-    sentiment = await comment_service._determine_sentiment("great video")
-    assert sentiment in {"positive", "neutral", "negative", None}
+from app.models.video import Video, VideoStatusEnum, VideoID
 
 
 @pytest.fixture
 def viewer_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Test",
-        lastName="User",
+        userid=uuid4(),
+        firstname="Test",
+        lastname="User",
         email="test@example.com",
         roles=["viewer"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
+    )
+
+
+@pytest.fixture
+def sample_video(viewer_user: User) -> Video:
+    return Video(
+        videoid=uuid4(),
+        userid=viewer_user.userid,
+        added_date=datetime.now(timezone.utc),
+        name="Test Video",
+        location="http://example.com/video.mp4",
+        location_type=0,
+        title="Test Video",
     )
 
 
 @pytest.mark.asyncio
-async def test_add_comment_success(viewer_user: User):
-    video_id = uuid4()
+async def test_add_comment_success(viewer_user: User, sample_video: Video):
     request = CommentCreateRequest(text="Nice video!")
-
-    # Mock video ready
-    ready_video = Video(
-        videoId=video_id,
-        userId=uuid4(),
-        youtubeVideoId="abc",
-        submittedAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
-        status=VideoStatusEnum.READY,
-        title="Title",
-        description=None,
-        tags=[],
-        thumbnailUrl=None,
-        viewCount=0,
-        averageRating=None,
-    )
+    sample_video.status = VideoStatusEnum.READY
 
     with (
-        patch("app.services.comment_service.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get_vid,
-        patch("app.services.comment_service.get_table", new_callable=AsyncMock) as mock_get_table,
+        patch(
+            "app.services.comment_service.video_service.get_video_by_id",
+            new_callable=AsyncMock,
+        ) as mock_get_vid,
+        patch(
+            "app.services.comment_service.get_table", new_callable=AsyncMock
+        ) as mock_get_table,
     ):
-        mock_get_vid.return_value = ready_video
-        mock_table = AsyncMock()
-        mock_get_table.return_value = mock_table
+        mock_get_vid.return_value = sample_video
+        mock_table_video = AsyncMock()
+        mock_table_user = AsyncMock()
+        mock_get_table.side_effect = [mock_table_video, mock_table_user]
 
         comment = await comment_service.add_comment_to_video(
-            video_id=video_id, request=request, current_user=viewer_user, db_table=mock_table
+            video_id=sample_video.videoid,
+            request=request,
+            current_user=viewer_user,
         )
 
-        mock_table.insert_one.assert_called_once()
+        assert mock_table_video.insert_one.call_count == 1
+        assert mock_table_user.insert_one.call_count == 1
+        assert comment.comment == request.text
+        assert comment.videoid == sample_video.videoid
+        assert comment.userid == viewer_user.userid
         assert comment.text == request.text
-        assert comment.videoId == video_id
-        assert comment.userId == viewer_user.userId
 
 
 @pytest.mark.asyncio
-async def test_add_comment_video_not_ready(viewer_user: User):
-    video_id = uuid4()
+async def test_add_comment_video_not_ready(viewer_user: User, sample_video: Video):
     request = CommentCreateRequest(text="Hello")
+    sample_video.status = VideoStatusEnum.PENDING
 
-    not_ready_video = Video(
-        videoId=video_id,
-        userId=uuid4(),
-        youtubeVideoId="abc",
-        submittedAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
-        status=VideoStatusEnum.PENDING,
-        title="Title",
-        description=None,
-        tags=[],
-        thumbnailUrl=None,
-        viewCount=0,
-        averageRating=None,
-    )
-
-    with patch("app.services.comment_service.video_service.get_video_by_id", new_callable=AsyncMock) as mock_get_vid:
-        mock_get_vid.return_value = not_ready_video
+    with patch(
+        "app.services.comment_service.video_service.get_video_by_id",
+        new_callable=AsyncMock,
+    ) as mock_get_vid:
+        mock_get_vid.return_value = sample_video
         with pytest.raises(comment_service.HTTPException) as exc_info:
             await comment_service.add_comment_to_video(
-                video_id=video_id, request=request, current_user=viewer_user, db_table=AsyncMock()
+                video_id=sample_video.videoid,
+                request=request,
+                current_user=viewer_user,
             )
         assert exc_info.value.status_code == 404
 
@@ -100,7 +93,9 @@ async def test_add_comment_video_not_ready(viewer_user: User):
 @pytest.mark.asyncio
 async def test_list_comments_for_video():
     mock_db = AsyncMock()
-    mock_db.find = MagicMock(return_value=[])
+    mock_cursor = AsyncMock()
+    mock_cursor.to_list.return_value = []
+    mock_db.find.return_value = mock_cursor
     mock_db.count_documents.return_value = 0
     comments, total = await comment_service.list_comments_for_video(
         video_id=uuid4(), page=1, page_size=10, db_table=mock_db
@@ -111,7 +106,9 @@ async def test_list_comments_for_video():
 @pytest.mark.asyncio
 async def test_list_comments_by_user():
     mock_db = AsyncMock()
-    mock_db.find = MagicMock(return_value=[])
+    mock_cursor = AsyncMock()
+    mock_cursor.to_list.return_value = []
+    mock_db.find.return_value = mock_cursor
     mock_db.count_documents.return_value = 0
     comments, total = await comment_service.list_comments_by_user(
         user_id=uuid4(), page=1, page_size=10, db_table=mock_db
@@ -122,31 +119,40 @@ async def test_list_comments_by_user():
 @pytest.mark.asyncio
 async def test_get_comment_by_id_found():
     comment_id = uuid4()
+    video_id = uuid4()
     sample_doc = {
-        "commentId": str(comment_id),
-        "videoId": str(uuid4()),
-        "userId": str(uuid4()),
+        "commentid": comment_id,
+        "videoid": video_id,
+        "userid": uuid4(),
+        "comment": "sample",
         "text": "sample",
-        "createdAt": datetime.now(timezone.utc),
-        "updatedAt": datetime.now(timezone.utc),
     }
 
     mock_db = AsyncMock()
     mock_db.find_one.return_value = sample_doc
 
-    comment = await comment_service.get_comment_by_id(comment_id=comment_id, db_table=mock_db)
+    comment = await comment_service.get_comment_by_id(
+        comment_id=comment_id, video_id=video_id, db_table=mock_db
+    )
 
-    mock_db.find_one.assert_called_once_with(filter={"commentId": str(comment_id)})
-    assert comment is not None and comment.commentId == comment_id
+    mock_db.find_one.assert_called_once_with(
+        filter={"videoid": video_id, "commentid": comment_id}
+    )
+    assert comment is not None and comment.commentid == comment_id
 
 
 @pytest.mark.asyncio
 async def test_get_comment_by_id_not_found():
     comment_id = uuid4()
+    video_id = uuid4()
     mock_db = AsyncMock()
     mock_db.find_one.return_value = None
 
-    comment = await comment_service.get_comment_by_id(comment_id=comment_id, db_table=mock_db)
+    comment = await comment_service.get_comment_by_id(
+        comment_id=comment_id, video_id=video_id, db_table=mock_db
+    )
 
-    mock_db.find_one.assert_called_once_with(filter={"commentId": str(comment_id)})
-    assert comment is None 
+    mock_db.find_one.assert_called_once_with(
+        filter={"videoid": video_id, "commentid": comment_id}
+    )
+    assert comment is None

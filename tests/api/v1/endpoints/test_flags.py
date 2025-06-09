@@ -16,24 +16,28 @@ from app.models.user import User
 @pytest.fixture
 def viewer_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="View",
-        lastName="Er",
+        userid=uuid4(),
+        firstname="View",
+        lastname="Er",
         email="view@example.com",
         roles=["viewer"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
 @pytest.fixture
 def viewer_token(viewer_user: User) -> str:
-    return create_access_token(subject=viewer_user.userId, roles=viewer_user.roles)
+    return create_access_token(
+        subject=viewer_user.userid, roles=[viewer_user.account_status]
+    )
 
 
 @pytest.mark.asyncio
 async def test_post_flag_success(viewer_user: User, viewer_token: str):
     sample_flag = Flag(
         flagId=uuid4(),
-        userId=viewer_user.userId,
+        userId=viewer_user.userid,
         contentType=ContentTypeEnum.VIDEO,
         contentId=uuid4(),
         reasonCode=FlagReasonCodeEnum.SPAM,
@@ -43,11 +47,16 @@ async def test_post_flag_success(viewer_user: User, viewer_token: str):
         status=FlagStatusEnum.OPEN,
     )
 
-    with patch(
-        "app.api.v1.endpoints.flags.flag_service.create_flag", new_callable=AsyncMock
-    ) as mock_create, patch(
-        "app.services.user_service.get_user_by_id_from_table", new_callable=AsyncMock
-    ) as mock_get_user:
+    with (
+        patch(
+            "app.api.v1.endpoints.flags.flag_service.create_flag",
+            new_callable=AsyncMock,
+        ) as mock_create,
+        patch(
+            "app.services.user_service.get_user_by_id_from_table",
+            new_callable=AsyncMock,
+        ) as mock_get_user,
+    ):
         mock_create.return_value = sample_flag
         mock_get_user.return_value = viewer_user
 
@@ -60,7 +69,9 @@ async def test_post_flag_success(viewer_user: User, viewer_token: str):
         }
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            resp = await ac.post(f"{settings.API_V1_STR}/flags", json=payload, headers=headers)
+            resp = await ac.post(
+                f"{settings.API_V1_STR}/flags", json=payload, headers=headers
+            )
 
         assert resp.status_code == status.HTTP_201_CREATED
         mock_create.assert_awaited_once()
@@ -76,4 +87,4 @@ async def test_post_flag_no_token():
     async with AsyncClient(app=app, base_url="http://test") as ac:
         resp = await ac.post(f"{settings.API_V1_STR}/flags", json=payload)
 
-    assert resp.status_code == status.HTTP_401_UNAUTHORIZED 
+    assert resp.status_code == status.HTTP_401_UNAUTHORIZED

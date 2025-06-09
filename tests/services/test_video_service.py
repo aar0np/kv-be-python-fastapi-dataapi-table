@@ -4,7 +4,12 @@ from uuid import uuid4
 from datetime import datetime, timezone
 
 from app.services import video_service
-from app.models.video import VideoSubmitRequest, VideoStatusEnum, Video, VideoUpdateRequest
+from app.models.video import (
+    VideoSubmitRequest,
+    VideoStatusEnum,
+    Video,
+    VideoUpdateRequest,
+)
 from app.models.user import User
 
 
@@ -16,13 +21,14 @@ from app.models.user import User
 @pytest.fixture
 def test_user() -> User:
     """Return a minimal User object with a *creator* role for tests."""
-
     return User(
-        userId=uuid4(),
-        firstName="Unit",
-        lastName="Tester",
+        userid=uuid4(),
+        firstname="Unit",
+        lastname="Tester",
         email="unittest@example.com",
         roles=["creator"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
@@ -78,15 +84,15 @@ async def test_submit_new_video_success(test_user: User):
     args, kwargs = mock_db_table.insert_one.call_args
     inserted_doc = kwargs.get("document")
     assert inserted_doc is not None
-    assert inserted_doc["videoId"] == str(deterministic_video_id)
-    assert inserted_doc["userId"] == str(test_user.userId)
+    assert inserted_doc["videoid"] == deterministic_video_id
+    assert inserted_doc["userid"] == test_user.userid
     assert inserted_doc["youtubeVideoId"] == "abcdefghijk"
     assert inserted_doc["status"] == video_service.VideoStatusEnum.PENDING
 
     # Assertions on returned model
     assert isinstance(new_video, Video)
-    assert new_video.videoId == deterministic_video_id
-    assert new_video.userId == test_user.userId
+    assert new_video.videoid == deterministic_video_id
+    assert new_video.userid == test_user.userid
     assert new_video.youtubeVideoId == "abcdefghijk"
     assert new_video.status == VideoStatusEnum.PENDING
 
@@ -109,7 +115,9 @@ async def test_submit_new_video_invalid_url(test_user: User):
 async def test_submit_new_video_uses_get_table_when_none(test_user: User):
     request = VideoSubmitRequest(youtubeUrl="https://youtu.be/abcdefghijk")
 
-    with patch("app.services.video_service.get_table", new_callable=AsyncMock) as mock_get_table:
+    with patch(
+        "app.services.video_service.get_table", new_callable=AsyncMock
+    ) as mock_get_table:
         mock_actual_table = AsyncMock()
         mock_actual_table.insert_one.return_value = MagicMock(inserted_id="someid")
         mock_get_table.return_value = mock_actual_table
@@ -130,13 +138,15 @@ async def test_get_video_by_id_found(test_user: User):
     target_video = _build_video()
 
     mock_db_table = AsyncMock()
-    mock_db_table.find_one.return_value = video_service._video_to_document(target_video)
+    mock_db_table.find_one.return_value = target_video.model_dump(by_alias=False)
 
     result = await video_service.get_video_by_id(
-        video_id=target_video.videoId, db_table=mock_db_table
+        video_id=target_video.videoid, db_table=mock_db_table
     )
 
-    mock_db_table.find_one.assert_called_once_with(filter={"videoId": str(target_video.videoId)})
+    mock_db_table.find_one.assert_called_once_with(
+        filter={"videoid": target_video.videoid}
+    )
     assert result == target_video
 
 
@@ -145,7 +155,9 @@ async def test_get_video_by_id_not_found():
     mock_db_table = AsyncMock()
     mock_db_table.find_one.return_value = None
 
-    result = await video_service.get_video_by_id(video_id=uuid4(), db_table=mock_db_table)
+    result = await video_service.get_video_by_id(
+        video_id=uuid4(), db_table=mock_db_table
+    )
     assert result is None
 
 
@@ -154,18 +166,12 @@ async def test_get_video_by_id_not_found():
 
 def _build_video():
     return Video(
-        videoId=uuid4(),
-        userId=uuid4(),
-        youtubeVideoId="abcdefghijk",
-        submittedAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
-        status=VideoStatusEnum.PENDING,
-        title="Title",
-        description=None,
-        tags=[],
-        thumbnailUrl=None,
-        viewCount=0,
-        averageRating=None,
+        videoid=uuid4(),
+        userid=uuid4(),
+        added_date=datetime.now(timezone.utc),
+        name="Title",
+        location="http://example.com/video.mp4",
+        location_type=0,
     )
 
 
@@ -177,10 +183,14 @@ def _build_video():
 @pytest.mark.asyncio
 async def test_update_video_details_success():
     original_video = _build_video()
-    update_req = VideoUpdateRequest(title="New Title", description="New desc")
+    update_req = VideoUpdateRequest(name="New Title", description="New desc")
 
     mock_db_table = AsyncMock()
     mock_db_table.update_one.return_value = AsyncMock()
+    # Mock the re-fetch call
+    updated_doc = original_video.model_dump(by_alias=False)
+    updated_doc.update(update_req.model_dump(by_alias=False, exclude_unset=True))
+    mock_db_table.find_one.return_value = updated_doc
 
     result = await video_service.update_video_details(
         video_to_update=original_video,
@@ -189,9 +199,8 @@ async def test_update_video_details_success():
     )
 
     mock_db_table.update_one.assert_called_once()
-    assert result.title == "New Title"
+    assert result.name == "New Title"
     assert result.description == "New desc"
-    assert result.updatedAt > original_video.updatedAt
 
 
 @pytest.mark.asyncio
@@ -220,21 +229,12 @@ async def test_update_video_details_no_changes():
 async def test_record_video_view_success():
     vid = uuid4()
     mock_db = AsyncMock()
-    mock_db.find_one.return_value = {"videoId": str(vid), "viewCount": 1}
     mock_db.update_one.return_value = AsyncMock()
 
-    success = await video_service.record_video_view(vid, mock_db)
-    assert success is True
-    mock_db.update_one.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_record_video_view_not_found():
-    mock_db = AsyncMock()
-    mock_db.find_one.return_value = None
-
-    success = await video_service.record_video_view(uuid4(), mock_db)
-    assert success is False
+    await video_service.record_video_view(vid, mock_db)
+    mock_db.update_one.assert_called_once_with(
+        filter={"videoid": vid}, update={"$inc": {"views": 1}}, upsert=True
+    )
 
 
 # ------------------------------------------------------------
@@ -245,14 +245,26 @@ async def test_record_video_view_not_found():
 @pytest.mark.asyncio
 async def test_list_latest_videos():
     mock_db = AsyncMock()
-    mock_db.find = MagicMock(return_value=[])
+    mock_db.find.return_value = []
     mock_db.count_documents.return_value = 0
 
-    summaries, total = await video_service.list_latest_videos(1, 10, mock_db)
-    mock_db.find.assert_called_once()
-    mock_db.count_documents.assert_called_once()
-    assert summaries == []
-    assert total == 0
+    with patch(
+        "app.services.video_service.list_videos_with_query",
+        new_callable=AsyncMock,
+    ) as mock_list_with_query:
+        mock_list_with_query.return_value = ([], 0)
+
+        summaries, total = await video_service.list_latest_videos(1, 10, mock_db)
+
+        mock_list_with_query.assert_called_once_with(
+            {},
+            1,
+            10,
+            db_table=mock_db,
+            source_table_name=video_service.LATEST_VIDEOS_TABLE_NAME,
+        )
+        assert summaries == []
+        assert total == 0
 
 
 # ------------------------------------------------------------
@@ -263,17 +275,22 @@ async def test_list_latest_videos():
 @pytest.mark.asyncio
 async def test_search_videos_by_keyword():
     mock_db = AsyncMock()
-    mock_db.find = MagicMock(return_value=[])
-    mock_db.count_documents = AsyncMock(return_value=0)
+    mock_db.find.return_value = []
+    mock_db.count_documents.return_value = 0
 
-    summaries, total = await video_service.search_videos_by_keyword(
-        query="test", page=1, page_size=10, db_table=mock_db
-    )
+    with patch(
+        "app.services.video_service.list_videos_with_query",
+        new_callable=AsyncMock,
+    ) as mock_list_with_query:
+        mock_list_with_query.return_value = ([], 0)
 
-    mock_db.find.assert_called_once()
-    mock_db.count_documents.assert_called_once()
-    assert summaries == []
-    assert total == 0
+        summaries, total = await video_service.search_videos_by_keyword(
+            query="test", page=1, page_size=10, db_table=mock_db
+        )
+
+        mock_list_with_query.assert_called_once()
+        assert summaries == []
+        assert total == 0
 
 
 # ------------------------------------------------------------
@@ -315,7 +332,9 @@ async def test_suggest_tags_no_match():
 @patch("app.services.video_service.MockYouTubeService")
 @patch("app.services.video_service.get_table")
 @patch("app.services.video_service.asyncio.sleep", new_callable=AsyncMock)
-async def test_process_video_submission_success(mock_sleep, mock_get_table, mock_mock_yt):  # noqa: D401,E501
+async def test_process_video_submission_success(
+    mock_sleep, mock_get_table, mock_mock_yt
+):  # noqa: D401,E501
     """Verify happy path where YouTube details are found and status transitions
     PENDING -> PROCESSING -> READY.
     """
@@ -327,6 +346,7 @@ async def test_process_video_submission_success(mock_sleep, mock_get_table, mock
             "title": "Unit Test Title",
             "description": "Unit Test Desc",
             "thumbnail_url": "https://example.com/thumb.jpg",
+            "tags": ["test"],
         }
     )
 
@@ -343,17 +363,26 @@ async def test_process_video_submission_success(mock_sleep, mock_get_table, mock
     assert db_mock.update_one.call_count == 2
 
     first_call_kwargs = db_mock.update_one.call_args_list[0].kwargs
-    assert first_call_kwargs["update"]["$set"]["status"] == video_service.VideoStatusEnum.PROCESSING.value
+    assert (
+        first_call_kwargs["update"]["$set"]["status"]
+        == video_service.VideoStatusEnum.PROCESSING.value
+    )
+    assert first_call_kwargs["update"]["$set"]["name"] == "Unit Test Title"
 
     second_call_kwargs = db_mock.update_one.call_args_list[1].kwargs
-    assert second_call_kwargs["update"]["$set"]["status"] == video_service.VideoStatusEnum.READY.value
+    assert (
+        second_call_kwargs["update"]["$set"]["status"]
+        == video_service.VideoStatusEnum.READY.value
+    )
 
 
 @pytest.mark.asyncio
 @patch("app.services.video_service.MockYouTubeService")
 @patch("app.services.video_service.get_table")
 @patch("app.services.video_service.asyncio.sleep", new_callable=AsyncMock)
-async def test_process_video_submission_failure(mock_sleep, mock_get_table, mock_mock_yt):  # noqa: D401,E501
+async def test_process_video_submission_failure(
+    mock_sleep, mock_get_table, mock_mock_yt
+):  # noqa: D401,E501
     """Verify path where YouTube details *aren't* found leading to ERROR status."""
 
     mock_instance = mock_mock_yt.return_value
@@ -369,4 +398,7 @@ async def test_process_video_submission_failure(mock_sleep, mock_get_table, mock
     # Only one DB update expected when details not found (ERROR status)
     db_mock.update_one.assert_called_once()
     call_kwargs = db_mock.update_one.call_args.kwargs
-    assert call_kwargs["update"]["$set"]["status"] == video_service.VideoStatusEnum.ERROR.value 
+    assert (
+        call_kwargs["update"]["$set"]["status"]
+        == video_service.VideoStatusEnum.ERROR.value
+    )

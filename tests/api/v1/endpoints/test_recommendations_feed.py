@@ -15,47 +15,56 @@ from app.models.video import VideoSummary
 @pytest.fixture
 def viewer_user() -> User:
     return User(
-        userId=uuid4(),
-        firstName="Viewer",
-        lastName="User",
+        userid=uuid4(),
+        firstname="Viewer",
+        lastname="User",
         email="viewer@example.com",
         roles=["viewer"],
+        created_date=datetime.now(timezone.utc),
+        account_status="active",
     )
 
 
 @pytest.fixture
 def viewer_token(viewer_user: User) -> str:
-    return create_access_token(subject=viewer_user.userId, roles=viewer_user.roles)
+    return create_access_token(
+        subject=viewer_user.userid, roles=[viewer_user.account_status]
+    )
 
 
 @pytest.mark.asyncio
 async def test_foryou_endpoint_success(viewer_user: User, viewer_token: str):
     sample_summary = VideoSummary(
-        videoId=uuid4(),
+        videoid=uuid4(),
+        name="Video",
+        preview_image_location=None,
+        userid=uuid4(),
+        added_date=datetime.now(timezone.utc),
         title="Video",
-        thumbnailUrl=None,
-        userId=uuid4(),
-        submittedAt=datetime.now(timezone.utc),
-        viewCount=0,
-        averageRating=None,
     )
 
-    with patch(
-        "app.api.v1.endpoints.recommendations_feed.recommendation_service.get_personalized_for_you_videos",
-        new_callable=AsyncMock,
-    ) as mock_service, patch(
-        "app.services.user_service.get_user_by_id_from_table",
-        new_callable=AsyncMock,
-    ) as mock_get_user:
+    with (
+        patch(
+            "app.api.v1.endpoints.recommendations_feed.recommendation_service.get_personalized_for_you_videos",
+            new_callable=AsyncMock,
+        ) as mock_service,
+        patch(
+            "app.services.user_service.get_user_by_id_from_table",
+            new_callable=AsyncMock,
+        ) as mock_get_user,
+    ):
         mock_service.return_value = ([sample_summary], 1)
         mock_get_user.return_value = viewer_user
 
         headers = {"Authorization": f"Bearer {viewer_token}"}
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            resp = await ac.get(f"{settings.API_V1_STR}/recommendations/foryou?page=1&pageSize=10", headers=headers)
+            resp = await ac.get(
+                f"{settings.API_V1_STR}/recommendations/foryou?page=1&pageSize=10",
+                headers=headers,
+            )
 
         if resp.status_code != status.HTTP_200_OK:
-            print('DEBUG response', resp.status_code, resp.json())
+            print("DEBUG response", resp.status_code, resp.json())
         assert resp.status_code == status.HTTP_200_OK
         mock_service.assert_awaited_once()
         json_body = resp.json()
@@ -66,6 +75,8 @@ async def test_foryou_endpoint_success(viewer_user: User, viewer_token: str):
 @pytest.mark.asyncio
 async def test_foryou_endpoint_requires_auth():
     async with AsyncClient(app=app, base_url="http://test") as ac:
-        resp = await ac.get(f"{settings.API_V1_STR}/recommendations/foryou?page=1&pageSize=10")
+        resp = await ac.get(
+            f"{settings.API_V1_STR}/recommendations/foryou?page=1&pageSize=10"
+        )
 
-    assert resp.status_code == status.HTTP_401_UNAUTHORIZED 
+    assert resp.status_code == status.HTTP_401_UNAUTHORIZED
