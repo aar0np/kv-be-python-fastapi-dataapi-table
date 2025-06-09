@@ -20,4 +20,4 @@ try:
 except PackageNotFoundError:  # running in editable mode / source checkout
     __version__ = os.getenv("APP_VERSION", "0.0.0-dev")
 
-__all__ = ["__version__", "PACKAGE_NAME"] 
+__all__ = ["__version__", "PACKAGE_NAME"]

@@ -17,7 +17,16 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.db.astra_client import init_astra_db
 from app.models.common import ProblemDetail
-from app.api.v1.endpoints import account_management, video_catalog, search_catalog, comments_ratings, recommendations_feed, reco_internal, flags, moderation
+from app.api.v1.endpoints import (
+    account_management,
+    video_catalog,
+    search_catalog,
+    comments_ratings,
+    recommendations_feed,
+    reco_internal,
+    flags,
+    moderation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +51,7 @@ app.include_router(api_router_v1)
 
 try:
     import httpx  # type: ignore
+
     HttpxConnectError = httpx.ConnectError
 except ModuleNotFoundError:  # pragma: no cover
     httpx = None  # type: ignore
@@ -51,6 +61,7 @@ try:
     from httpcore import ConnectError as HttpcoreConnectError  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover
     HttpcoreConnectError = None  # type: ignore
+
 
 @app.on_event("startup")
 async def startup_event():

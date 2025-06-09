@@ -64,4 +64,4 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 @service_app.get("/", summary="Health check")
 async def service_root():
-    return {"service": "moderation", "status": "healthy"} 
+    return {"service": "moderation", "status": "healthy"}

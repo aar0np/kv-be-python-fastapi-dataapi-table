@@ -71,4 +71,4 @@ async def generic_exception_handler(request: Request, exc: Exception):  # noqa: 
 async def service_root():
     """Simple heartbeat endpoint."""
 
-    return {"service": "user", "status": "healthy"} 
+    return {"service": "user", "status": "healthy"}
