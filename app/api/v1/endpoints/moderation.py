@@ -29,6 +29,7 @@ router = APIRouter(prefix="/moderation", tags=["Moderation Actions"])
 
 # Helper to construct paginated response consistently
 
+
 def _build_paginated_flags(
     flags: List[FlagResponse] | List[Flag], total: int, pagination: PaginationParams
 ) -> PaginatedResponse[FlagResponse]:
@@ -58,7 +59,9 @@ def _build_paginated_flags(
 )
 async def list_all_flags(
     pagination: PaginationParams = Depends(),
-    status_filter: Optional[FlagStatusEnum] = Query(None, alias="status", description="Filter by flag status"),
+    status_filter: Optional[FlagStatusEnum] = Query(
+        None, alias="status", description="Filter by flag status"
+    ),
     current_moderator: Annotated[User, Depends(get_current_moderator)] = None,
 ):
     flags, total = await flag_service.list_flags(
@@ -78,7 +81,9 @@ async def get_flag_details(
 ):
     flag = await flag_service.get_flag_by_id(flag_id=flag_id_path)
     if flag is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found"
+        )
     return flag
 
 
@@ -94,10 +99,14 @@ async def act_on_flag(
 ):
     flag_obj = await flag_service.get_flag_by_id(flag_id=flag_id_path)
     if flag_obj is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found"
+        )
 
     if flag_obj.status not in {FlagStatusEnum.OPEN, FlagStatusEnum.UNDER_REVIEW}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Flag already resolved")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Flag already resolved"
+        )
 
     updated_flag = await flag_service.action_on_flag(
         flag_to_action=flag_obj,
@@ -131,7 +140,9 @@ async def assign_moderator_endpoint(
 ):
     updated = await user_service.assign_role_to_user(user_id_path, "moderator")
     if updated is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     return updated
 
 
@@ -146,7 +157,9 @@ async def revoke_moderator_endpoint(
 ):
     updated = await user_service.revoke_role_from_user(user_id_path, "moderator")
     if updated is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     return updated
 
 
@@ -167,7 +180,9 @@ async def restore_video_endpoint(
 ):
     success = await video_service.restore_video(video_id_path)
     msg = "initiated" if success else "failed"
-    return ContentRestoreResponse(content_id=video_id_path, content_type="video", status_message=msg)
+    return ContentRestoreResponse(
+        content_id=video_id_path, content_type="video", status_message=msg
+    )
 
 
 @router.post(
@@ -181,4 +196,6 @@ async def restore_comment_endpoint(
 ):
     success = await comment_service.restore_comment(comment_id_path)
     msg = "initiated" if success else "failed"
-    return ContentRestoreResponse(content_id=comment_id_path, content_type="comment", status_message=msg) 
+    return ContentRestoreResponse(
+        content_id=comment_id_path, content_type="comment", status_message=msg
+    )

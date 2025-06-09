@@ -1,4 +1,3 @@
-from uuid import UUID
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, status, Depends
@@ -25,7 +24,9 @@ router = APIRouter(prefix="/users", tags=["Users"])
     summary="Register new account",
 )
 async def register_user(user_in: UserCreateRequest):
-    existing_user = await user_service.get_user_by_email_from_table(email=user_in.email)
+    existing_user = await user_service.get_user_by_email_from_credentials_table(
+        email=user_in.email
+    )
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -34,12 +35,7 @@ async def register_user(user_in: UserCreateRequest):
 
     created_user_doc = await user_service.create_user_in_table(user_in=user_in)
 
-    return UserCreateResponse(
-        userId=UUID(created_user_doc["userid"]),
-        firstName=created_user_doc["firstName"],
-        lastName=created_user_doc["lastName"],
-        email=created_user_doc["email"],
-    )
+    return UserCreateResponse.model_validate(created_user_doc)
 
 
 @router.post("/login", response_model=UserLoginResponse, summary="Login → JWT")
@@ -55,15 +51,14 @@ async def login_for_access_token(form_data: UserLoginRequest):
         )
 
     access_token = create_access_token(
-        subject=authenticated_user.userId, roles=authenticated_user.roles
+        subject=authenticated_user.userid,
+        roles=[authenticated_user.account_status],
     )
     return UserLoginResponse(token=access_token, user=authenticated_user)
 
 
 @router.get("/me", response_model=User, summary="Current user profile")
-async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_viewer)]
-):
+async def read_users_me(current_user: Annotated[User, Depends(get_current_viewer)]):
     return current_user
 
 

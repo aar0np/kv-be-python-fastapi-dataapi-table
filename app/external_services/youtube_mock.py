@@ -12,7 +12,9 @@ from typing import Optional, Dict, Any
 class MockYouTubeService:
     """Return mocked metadata for provided YouTube video IDs."""
 
-    async def get_video_details(self, youtube_video_id: str) -> Optional[Dict[str, Any]]:  # noqa: D401,E501
+    async def get_video_details(
+        self, youtube_video_id: str
+    ) -> Optional[Dict[str, Any]]:  # noqa: D401,E501
         """Fetch mocked video details.
 
         Parameters
@@ -45,4 +47,4 @@ class MockYouTubeService:
             "description": "A generic description.",
             "thumbnail_url": "https://example.com/generic_thumb.jpg",
             "duration_seconds": 120,
-        } 
+        }

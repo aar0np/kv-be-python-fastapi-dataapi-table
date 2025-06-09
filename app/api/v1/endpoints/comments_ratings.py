@@ -5,13 +5,21 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
-from app.models.comment import CommentCreateRequest, CommentResponse
+from app.models.comment import CommentCreateRequest, CommentResponse, Comment
 from app.models.video import VideoID
 from app.models.user import User
-from app.api.v1.dependencies import get_current_viewer, PaginationParams, get_current_user_optional
+from app.api.v1.dependencies import (
+    get_current_viewer,
+    PaginationParams,
+    get_current_user_optional,
+)
 from app.models.common import PaginatedResponse, Pagination
 from app.services import comment_service, rating_service
-from app.models.rating import RatingCreateOrUpdateRequest, RatingResponse, AggregateRatingResponse
+from app.models.rating import (
+    RatingCreateOrUpdateRequest,
+    RatingResponse,
+    AggregateRatingResponse,
+)
 
 router = APIRouter(tags=["Comments & Ratings"])
 
@@ -32,16 +40,17 @@ async def post_comment_to_video(
     new_comment = await comment_service.add_comment_to_video(
         video_id=video_id_path, request=comment_data, current_user=current_user
     )
-    return new_comment
+    return CommentResponse.model_validate(new_comment)
 
 
 # pagination helper
 
 
-def _build_paginated(data: List[CommentResponse], total: int, pagination: PaginationParams):
+def _build_paginated(data: List[Comment], total: int, pagination: PaginationParams):
+    response_data = [CommentResponse.model_validate(c) for c in data]
     pages = (total + pagination.pageSize - 1) // pagination.pageSize
     return PaginatedResponse(
-        data=data,
+        data=response_data,
         pagination=Pagination(
             currentPage=pagination.page,
             pageSize=pagination.pageSize,
@@ -122,4 +131,4 @@ async def get_rating_summary_video(
     summary = await rating_service.get_video_ratings_summary(
         video_id=video_id_path, current_user_id=user_id
     )
-    return summary 
+    return summary

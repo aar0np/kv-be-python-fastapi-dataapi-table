@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple, Dict, Any  # noqa: F401
 from uuid import UUID, uuid4
+import inspect
 
 from fastapi import HTTPException, status
 
@@ -90,7 +91,7 @@ async def create_flag(
 
     await db_table.insert_one(document=doc)
 
-    return new_flag 
+    return new_flag
 
 
 async def list_flags(
@@ -118,9 +119,8 @@ async def list_flags(
         sort={"createdAt": -1},
     )
 
-    docs = (
-        await cursor.to_list() if hasattr(cursor, "to_list") else cursor
-    )
+    raw_docs = cursor.to_list() if hasattr(cursor, "to_list") else cursor
+    docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
 
     total_items = await db_table.count_documents(filter=query_filter)
 
@@ -158,7 +158,9 @@ async def action_on_flag(
         "status": new_status.value,
         "moderatorId": str(moderator.userId),
         "updatedAt": now,
-        "resolvedAt": now if new_status in {FlagStatusEnum.APPROVED, FlagStatusEnum.REJECTED} else None,
+        "resolvedAt": now
+        if new_status in {FlagStatusEnum.APPROVED, FlagStatusEnum.REJECTED}
+        else None,
         "moderatorNotes": moderator_notes,
     }
 
@@ -180,4 +182,4 @@ async def action_on_flag(
         "moderatorId": moderator.userId,
     }
 
-    return flag_to_action.model_copy(update=update_payload_model) 
+    return flag_to_action.model_copy(update=update_payload_model)

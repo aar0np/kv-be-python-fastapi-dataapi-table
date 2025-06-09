@@ -1,4 +1,5 @@
 """Service logic for video ratings."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -8,7 +9,12 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from app.db.astra_client import get_table, AstraDBCollection
-from app.models.rating import RatingCreateOrUpdateRequest, Rating, AggregateRatingResponse, RatingValue
+from app.models.rating import (
+    RatingCreateOrUpdateRequest,
+    Rating,
+    AggregateRatingResponse,
+    RatingValue,
+)
 from app.models.video import VideoID, VideoStatusEnum
 from app.models.user import User
 from app.services import video_service
@@ -23,8 +29,12 @@ async def _update_video_aggregate_rating(
 ) -> None:
     """Recalculate average and total ratings count for the given video."""
 
-    cursor = ratings_db_table.find(filter={"videoId": str(video_id)}, projection={"rating": 1})
-    docs: List[Dict[str, Any]] = await cursor.to_list() if hasattr(cursor, "to_list") else cursor
+    cursor = ratings_db_table.find(
+        filter={"videoId": str(video_id)}, projection={"rating": 1}
+    )
+    docs: List[Dict[str, Any]] = (
+        await cursor.to_list() if hasattr(cursor, "to_list") else cursor
+    )
 
     if docs:
         values = [int(d["rating"]) for d in docs if "rating" in d]
@@ -54,7 +64,10 @@ async def rate_video(
 ) -> Rating:
     target_video = await video_service.get_video_by_id(video_id)
     if target_video is None or target_video.status != VideoStatusEnum.READY:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found or not available for rating")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found or not available for rating",
+        )
 
     if db_table is None:
         db_table = await get_table(RATINGS_TABLE_NAME)
@@ -64,7 +77,10 @@ async def rate_video(
     existing_doc = await db_table.find_one(filter=rating_filter)
 
     if existing_doc:
-        await db_table.update_one(filter=rating_filter, update={"$set": {"rating": request.rating, "updatedAt": now}})
+        await db_table.update_one(
+            filter=rating_filter,
+            update={"$set": {"rating": request.rating, "updatedAt": now}},
+        )
         created_at = existing_doc.get("createdAt", now)
         rating_obj = Rating(
             videoId=video_id,
@@ -87,7 +103,9 @@ async def rate_video(
         await db_table.insert_one(document=insert_doc)
 
     # update aggregate
-    await _update_video_aggregate_rating(video_id, db_table, await get_table(video_service.VIDEOS_TABLE_NAME))
+    await _update_video_aggregate_rating(
+        video_id, db_table, await get_table(video_service.VIDEOS_TABLE_NAME)
+    )
     return rating_obj
 
 
@@ -106,7 +124,9 @@ async def get_video_ratings_summary(
     # Fetch video to access pre-computed aggregates
     target_video = await video_service.get_video_by_id(video_id)
     if target_video is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
+        )
 
     avg = target_video.averageRating
     total = target_video.totalRatingsCount
@@ -117,7 +137,8 @@ async def get_video_ratings_summary(
             ratings_db_table = await get_table(RATINGS_TABLE_NAME)
 
         doc = await ratings_db_table.find_one(
-            filter={"videoId": str(video_id), "userId": str(current_user_id)}, projection={"rating": 1}
+            filter={"videoId": str(video_id), "userId": str(current_user_id)},
+            projection={"rating": 1},
         )
         if doc and "rating" in doc:
             user_rating_value = int(doc["rating"])
@@ -127,4 +148,4 @@ async def get_video_ratings_summary(
         averageRating=avg,
         totalRatingsCount=total,
         currentUserRating=user_rating_value,
-    ) 
+    )

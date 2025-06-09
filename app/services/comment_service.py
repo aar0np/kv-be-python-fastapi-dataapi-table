@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple, Dict, Any
-from uuid import uuid4, UUID
+from uuid import uuid4, UUID, uuid1
 
 from fastapi import HTTPException, status
 
@@ -15,23 +15,25 @@ from app.models.video import VideoID, VideoStatusEnum
 from app.services import video_service
 from app.external_services.sentiment_mock import MockSentimentAnalyzer
 
-COMMENTS_TABLE_NAME = "comments"
+COMMENTS_BY_VIDEO_TABLE_NAME = "comments"
+COMMENTS_BY_USER_TABLE_NAME = "comments_by_user"
 
 
-async def _determine_sentiment(text: str) -> Optional[str]:
+async def _determine_sentiment_score(text: str) -> Optional[float]:
     """Determine sentiment using a mocked analyser for deterministic results."""
-
     analyzer = MockSentimentAnalyzer()
-    return await analyzer.analyze(text)
+    # This mock now returns a float score instead of a string
+    return await analyzer.analyze_score(text)
 
 
 async def add_comment_to_video(
     video_id: VideoID,
     request: CommentCreateRequest,
     current_user: User,
-    db_table: Optional[AstraDBCollection] = None,
+    comments_by_video_table: Optional[AstraDBCollection] = None,
+    comments_by_user_table: Optional[AstraDBCollection] = None,
 ) -> Comment:
-    """Add a new comment to a READY video."""
+    """Add a new comment to a READY video, denormalizing for queries."""
 
     target_video = await video_service.get_video_by_id(video_id)
     if target_video is None or target_video.status != VideoStatusEnum.READY:
@@ -40,48 +42,35 @@ async def add_comment_to_video(
             detail="Video not found or not available for comments",
         )
 
-    if db_table is None:
-        db_table = await get_table(COMMENTS_TABLE_NAME)
+    if comments_by_video_table is None:
+        comments_by_video_table = await get_table(COMMENTS_BY_VIDEO_TABLE_NAME)
+    if comments_by_user_table is None:
+        comments_by_user_table = await get_table(COMMENTS_BY_USER_TABLE_NAME)
 
-    now = datetime.now(timezone.utc)
-    sentiment = await _determine_sentiment(request.text)
+    sentiment_score = await _determine_sentiment_score(request.text)
+    comment_id = uuid1()
 
     new_comment = Comment(
-        commentId=uuid4(),
-        videoId=video_id,
-        userId=current_user.userId,
+        commentid=comment_id,
+        videoid=video_id,
+        userid=current_user.userid,
+        comment=request.text,
+        sentiment_score=sentiment_score,
         text=request.text,
-        createdAt=now,
-        updatedAt=now,
-        sentiment=sentiment,
     )
 
-    doc = new_comment.model_dump()
-    doc["commentId"] = str(doc["commentId"])
-    doc["videoId"] = str(doc["videoId"])
-    doc["userId"] = str(doc["userId"])
+    comment_doc = new_comment.model_dump(by_alias=False)
 
-    await db_table.insert_one(document=doc)
+    # Write to both tables
+    await comments_by_video_table.insert_one(document=comment_doc)
+    await comments_by_user_table.insert_one(document=comment_doc)
+
     return new_comment
 
 
 # ---------------------------------------------------------------------------
 # Listing helpers
 # ---------------------------------------------------------------------------
-
-
-def _doc_to_comment(doc: Dict[str, Any]) -> Comment:
-    """Convert DB dict to Comment model, handling UUIDs."""
-
-    return Comment(
-        commentId=UUID(doc["commentId"]),
-        videoId=UUID(doc["videoId"]),
-        userId=UUID(doc["userId"]),
-        text=doc["text"],
-        createdAt=doc["createdAt"],
-        updatedAt=doc["updatedAt"],
-        sentiment=doc.get("sentiment"),
-    )
 
 
 async def list_comments_for_video(
@@ -91,16 +80,25 @@ async def list_comments_for_video(
     db_table: Optional[AstraDBCollection] = None,
 ) -> Tuple[List[Comment], int]:
     if db_table is None:
-        db_table = await get_table(COMMENTS_TABLE_NAME)
+        db_table = await get_table(COMMENTS_BY_VIDEO_TABLE_NAME)
 
-    query_filter = {"videoId": str(video_id)}
+    # Note: AstraDB/Cassandra pagination is complex. A simple skip is not
+    # efficient. True pagination requires tracking paging state tokens.
+    # For this project, we'll use the simpler offset-based approach.
+    query_filter = {"videoid": video_id}
     skip = (page - 1) * page_size
-    cursor = db_table.find(
-        filter=query_filter, skip=skip, limit=page_size, sort={"createdAt": -1}
+
+    # The 'comments' table is ordered by commentid DESC, so no explicit sort is needed.
+    import inspect  # local import to avoid new dependency
+
+    cursor = db_table.find(filter=query_filter, skip=skip, limit=page_size)
+
+    raw_docs = (
+        cursor.to_list() if hasattr(cursor, "to_list") else cursor
     )
-    docs = await cursor.to_list() if hasattr(cursor, "to_list") else cursor
+    docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
     total = await db_table.count_documents(filter=query_filter)
-    return [_doc_to_comment(d) for d in docs], total
+    return [Comment.model_validate(d) for d in docs], total
 
 
 async def list_comments_by_user(
@@ -110,37 +108,49 @@ async def list_comments_by_user(
     db_table: Optional[AstraDBCollection] = None,
 ) -> Tuple[List[Comment], int]:
     if db_table is None:
-        db_table = await get_table(COMMENTS_TABLE_NAME)
+        db_table = await get_table(COMMENTS_BY_USER_TABLE_NAME)
 
-    query_filter = {"userId": str(user_id)}
+    query_filter = {"userid": user_id}
     skip = (page - 1) * page_size
-    cursor = db_table.find(filter=query_filter, skip=skip, limit=page_size, sort={"createdAt": -1})
-    docs = await cursor.to_list() if hasattr(cursor, "to_list") else cursor
+
+    # The 'comments_by_user' table is ordered by commentid DESC.
+    import inspect
+
+    cursor = db_table.find(filter=query_filter, skip=skip, limit=page_size)
+
+    raw_docs = (
+        cursor.to_list() if hasattr(cursor, "to_list") else cursor
+    )
+    docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
     total = await db_table.count_documents(filter=query_filter)
-    return [_doc_to_comment(d) for d in docs], total
+    return [Comment.model_validate(d) for d in docs], total
 
 
 async def get_comment_by_id(
     comment_id: CommentID,
+    video_id: VideoID,  # videoid is part of the partition key
     db_table: Optional[AstraDBCollection] = None,
 ) -> Optional[Comment]:
     """Fetch a single comment by its identifier, returning `None` if not found."""
 
     if db_table is None:
-        db_table = await get_table(COMMENTS_TABLE_NAME)
+        db_table = await get_table(COMMENTS_BY_VIDEO_TABLE_NAME)
 
-    doc = await db_table.find_one(filter={"commentId": str(comment_id)})
+    # Need both videoid and commentid to fetch a unique comment
+    doc = await db_table.find_one(filter={"videoid": video_id, "commentid": comment_id})
     if doc is None:
         return None
 
-    return _doc_to_comment(doc)
+    return Comment.model_validate(doc)
 
 
-async def restore_comment(comment_id: CommentID) -> bool:
+async def restore_comment(comment_id: CommentID, video_id: VideoID) -> bool:
     """Stub restore comment."""
-    comment = await get_comment_by_id(comment_id)
+    comment = await get_comment_by_id(comment_id, video_id)
     if comment is None:
         print(f"STUB: Comment {comment_id} not found for restore.")
         return False
-    print(f"STUB: Restoring comment {comment_id}. Deleted: {getattr(comment,'is_deleted',False)}")
-    return True 
+    print(
+        f"STUB: Restoring comment {comment_id}. Deleted: {getattr(comment,'is_deleted',False)}"
+    )
+    return True

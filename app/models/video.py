@@ -13,7 +13,7 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, ConfigDict
 
 # ---------------------------------------------------------------------------
 # Aliases (centralized)
@@ -39,7 +39,9 @@ class VideoStatusEnum(str, Enum):
 class VideoBase(BaseModel):
     """Fields shared by all video representations exposed publicly."""
 
-    title: str = Field(..., min_length=3, max_length=100)
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(..., min_length=3, max_length=100, alias="title")
     description: Optional[str] = Field(default=None, max_length=1000)
     tags: List[str] = Field(default_factory=list)
 
@@ -53,13 +55,25 @@ class VideoSubmitRequest(BaseModel):
 class Video(VideoBase):
     """Full canonical representation of a video stored in the database."""
 
-    videoId: VideoID = Field(default_factory=uuid4)
-    userId: UUID  # uploader's ID
-    youtubeVideoId: str
-    submittedAt: datetime
-    updatedAt: datetime
+    model_config = ConfigDict(populate_by_name=True)
+
+    videoid: VideoID = Field(default_factory=uuid4, alias="videoId")
+    userid: UUID = Field(..., alias="userId")
+    added_date: datetime = Field(..., alias="submittedAt")
+    preview_image_location: Optional[HttpUrl] = Field(None, alias="thumbnailUrl")
+
+    # Fields from schema
+    location: str
+    location_type: int
+    content_features: Optional[List[float]] = None
+    content_rating: Optional[str] = None
+    category: Optional[str] = None
+    language: Optional[str] = None
+
+    # Fields not in schema, but in original model
+    youtubeVideoId: Optional[str] = None
+    updatedAt: Optional[datetime] = None
     status: VideoStatusEnum = VideoStatusEnum.PENDING
-    thumbnailUrl: Optional[HttpUrl] = None
     viewCount: int = 0
     averageRating: Optional[float] = None
     totalRatingsCount: int = 0
@@ -70,7 +84,11 @@ class Video(VideoBase):
 class VideoUpdateRequest(BaseModel):
     """Payload for partial updates to a video owned by the caller or a moderator."""
 
-    title: Optional[str] = Field(default=None, min_length=3, max_length=100)
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(
+        default=None, min_length=3, max_length=100, alias="title"
+    )
     description: Optional[str] = Field(default=None, max_length=1000)
     tags: Optional[List[str]] = None
 
@@ -91,18 +109,46 @@ class VideoStatusResponse(BaseModel):
 class VideoSummary(BaseModel):
     """Smaller representation used in paginated lists (e.g., latest videos)."""
 
-    videoId: VideoID
-    title: str
-    thumbnailUrl: Optional[HttpUrl] = None
-    userId: UUID
-    submittedAt: datetime
+    model_config = ConfigDict(populate_by_name=True)
+
+    videoid: VideoID = Field(..., alias="videoId")
+    name: str = Field(..., alias="title")
+    preview_image_location: Optional[HttpUrl] = Field(None, alias="thumbnailUrl")
+    userid: UUID = Field(..., alias="userId")
+    added_date: datetime = Field(..., alias="submittedAt")
+
+    # Fields from latest_videos schema to be added for consistency
+    content_rating: Optional[str] = None
+    category: Optional[str] = None
+
+    # Fields not in latest_videos schema
     viewCount: int = 0
     averageRating: Optional[float] = None
+
+    # ------------------------------------------------------------------
+    # Compatibility helpers
+    # ------------------------------------------------------------------
+
+    @property  # type: ignore[override]
+    def videoId(self) -> VideoID:  # noqa: N802 – keep camelCase for backward-compat
+        """Alias for the canonical ``videoid`` field (snake_case)."""
+        return self.videoid
+
+    @property  # type: ignore[override]
+    def thumbnailUrl(self):  # noqa: N802
+        """Alias for ``preview_image_location``."""
+        return self.preview_image_location
+
+    @property  # type: ignore[override]
+    def title(self):  # noqa: N802
+        """Alias for ``name`` – kept for compatibility with earlier code."""
+        return self.name
 
 
 # ---------------------------------------------------------------------------
 # Ratings
 # ---------------------------------------------------------------------------
+
 
 class VideoRatingRequest(BaseModel):
     """Client payload for submitting a rating (1-5)."""
@@ -121,6 +167,7 @@ class VideoRatingSummary(BaseModel):
 # ---------------------------------------------------------------------------
 # Tag suggestion
 # ---------------------------------------------------------------------------
+
 
 class TagSuggestion(BaseModel):
     tag: str
@@ -142,4 +189,12 @@ __all__ = [
     "VideoRatingRequest",
     "VideoRatingSummary",
     "TagSuggestion",
-] 
+]
+
+# Ensure the full Video model also exposes camelCase aliases where useful.
+
+setattr(
+    Video,  # type: ignore[arg-type]
+    "videoId",
+    property(lambda self: self.videoid),  # noqa: B023
+)

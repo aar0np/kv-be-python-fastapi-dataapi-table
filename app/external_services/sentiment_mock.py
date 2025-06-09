@@ -18,13 +18,18 @@ from typing import Optional
 class MockSentimentAnalyzer:
     """Very naive deterministic sentiment inference for tests."""
 
-    async def analyze(self, text: str) -> Optional[str]:  # noqa: D401,E501
+    async def analyze_score(self, text: str) -> Optional[float]:  # noqa: D401,E501
+        """Return a sentiment score between -1.0 (negative) and 1.0 (positive)."""
         text_lower = text.lower()
-        if any(token in text_lower for token in {":(", "☹", "😢", "sad"}):
-            return "negative"
-        if "!" in text_lower or any(word in text_lower for word in {"great", "awesome", "love"}):
-            return "positive"
+        if any(
+            token in text_lower for token in {":(", "☹", "😢", "sad", "bad", "terrible"}
+        ):
+            return -0.8
+        if "!" in text_lower or any(
+            word in text_lower for word in {"great", "awesome", "love", "excellent"}
+        ):
+            return 0.9
         # For shorter texts, randomly skip returning sentiment (simulate uncertain)
-        if len(text.strip()) < 5:
+        if len(text.strip()) < 10:
             return None
-        return "neutral" 
+        return 0.1  # Default to slightly positive/neutral

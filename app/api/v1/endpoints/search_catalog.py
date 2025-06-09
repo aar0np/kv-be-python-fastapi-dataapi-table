@@ -12,7 +12,9 @@ from app.services import video_service
 router = APIRouter(prefix="/search", tags=["Search"])
 
 
-def _build_paginated_response(data: List[VideoSummary], total: int, pagination: PaginationParams):
+def _build_paginated_response(
+    data: List[VideoSummary], total: int, pagination: PaginationParams
+):
     total_pages = (total + pagination.pageSize - 1) // pagination.pageSize
     return PaginatedResponse(
         data=data,
@@ -47,6 +49,8 @@ async def search_videos(
 )
 async def suggest_video_tags(
     query: Annotated[str, Query(min_length=1, description="Partial tag to search for")],
-    limit: Annotated[int, Query(ge=1, le=25, description="Maximum number of suggestions")] = 10,
+    limit: Annotated[
+        int, Query(ge=1, le=25, description="Maximum number of suggestions")
+    ] = 10,
 ):
-    return await video_service.suggest_tags(query=query, limit=limit) 
+    return await video_service.suggest_tags(query=query, limit=limit)

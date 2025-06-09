@@ -32,9 +32,7 @@ async def get_for_you_feed(
     )
 
     total_pages = (total_items + pagination.pageSize - 1) // pagination.pageSize
-    return PaginatedResponse[
-        VideoSummary
-    ](  # type: ignore[valid-type]
+    return PaginatedResponse[VideoSummary](  # type: ignore[valid-type]
         data=videos,
         pagination=Pagination(
             currentPage=pagination.page,
@@ -42,4 +40,4 @@ async def get_for_you_feed(
             totalItems=total_items,
             totalPages=total_pages,
         ),
-    ) 
+    )

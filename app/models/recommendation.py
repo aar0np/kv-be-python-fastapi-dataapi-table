@@ -23,6 +23,15 @@ class RecommendationItem(BaseModel):
         description="Relevance score where 1 is most relevant.",
     )
 
+    # ------------------------------------------------------------------
+    # Compatibility helpers
+    # ------------------------------------------------------------------
+
+    @property  # type: ignore[override]
+    def videoid(self) -> VideoID:  # noqa: N802 – keep snake_case for compat
+        """Alias for camelCase *videoId* to maintain test compatibility."""
+        return self.videoId
+
 
 __all__ = [
     "RecommendationItem",
@@ -50,4 +59,4 @@ class EmbeddingIngestResponse(BaseModel):
 
     videoId: VideoID
     status: str
-    message: Optional[str] = None 
+    message: Optional[str] = None

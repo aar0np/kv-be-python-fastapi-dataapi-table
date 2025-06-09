@@ -13,7 +13,9 @@ from app.services import video_service
 from app.models.user import User
 
 
-async def get_related_videos(video_id: VideoID, limit: int = 10) -> List[RecommendationItem]:
+async def get_related_videos(
+    video_id: VideoID, limit: int = 10
+) -> List[RecommendationItem]:
     """Return a stubbed *related videos* list.
 
     In a future iteration this will call into a real recommendation engine that
@@ -30,7 +32,9 @@ async def get_related_videos(video_id: VideoID, limit: int = 10) -> List[Recomme
     if target_video is None:
         return []
 
-    latest_summaries, _total = await video_service.list_latest_videos(page=1, page_size=limit + 5)
+    latest_summaries, _total = await video_service.list_latest_videos(
+        page=1, page_size=limit + 5
+    )
 
     related_items: List[RecommendationItem] = []
 
@@ -69,7 +73,9 @@ async def get_personalized_for_you_videos(
         f"STUB: Generating 'For You' feed for user {current_user.userId} (page={page}, page_size={page_size})"
     )
 
-    videos, total_items = await video_service.list_latest_videos(page=page, page_size=page_size)
+    videos, total_items = await video_service.list_latest_videos(
+        page=page, page_size=page_size
+    )
     return videos, total_items
 
 
@@ -78,7 +84,9 @@ async def get_personalized_for_you_videos(
 # ---------------------------------------------------------------------------
 
 
-async def ingest_video_embedding(request: EmbeddingIngestRequest) -> EmbeddingIngestResponse:
+async def ingest_video_embedding(
+    request: EmbeddingIngestRequest,
+) -> EmbeddingIngestResponse:
     """Receive and store (stub) a video's vector embedding.
 
     A real implementation would persist the vector into a vector database or as part of the
@@ -106,4 +114,4 @@ async def ingest_video_embedding(request: EmbeddingIngestRequest) -> EmbeddingIn
         videoId=request.videoId,
         status="received_stub",
         message="Embedding data received and acknowledged (stub).",
-    ) 
+    )

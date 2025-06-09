@@ -28,6 +28,8 @@ async def ingest_embedding(
 
     if response.status == "error" and (response.message or "").startswith("Video"):
         # Normalise to HTTP 404 if video missing.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=response.message)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=response.message
+        )
 
-    return response 
+    return response

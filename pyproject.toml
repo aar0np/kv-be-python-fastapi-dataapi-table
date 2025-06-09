@@ -4,6 +4,7 @@ version = "2.0.0-alpha"
 description = "KillrVideo Python FastAPI Backend"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
+packages = [{ include = "app" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -13,6 +14,7 @@ pydantic-settings = "^2.9.1"
 python-jose = {extras = ["cryptography"], version = "^3.5.0"}
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 astrapy = "^2.0.1"
+cassandra-driver = "^3.29.2"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -22,6 +24,7 @@ httpx = "^0.28.1"
 mypy = "^1.16.0"
 ruff = "^0.11.12"
 email-validator = "^2.2.0"
+pyyaml = {version = "^6.0", optional = false}
 
 [build-system]
 requires = ["poetry-core"]
@@ -32,4 +35,7 @@ build-backend = "poetry.core.masonry.api"
 # ---------------------------------------------------------------------------
 
 [tool.ruff]
-extend-ignore = ["E402", "E702"]
+lint.extend-ignore = ["E402", "E702"]
+
+[tool.poetry.scripts]
+gen-openapi = "scripts.generate_openapi:main"

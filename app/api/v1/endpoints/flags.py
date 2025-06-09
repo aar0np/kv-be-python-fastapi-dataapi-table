@@ -26,4 +26,4 @@ async def submit_flag(
 ):
     """Create a new flag for the specified content."""
 
-    return await flag_service.create_flag(request=request, current_user=current_user) 
+    return await flag_service.create_flag(request=request, current_user=current_user)

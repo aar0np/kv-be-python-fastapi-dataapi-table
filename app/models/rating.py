@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.video import VideoID
 from app.models.common import UserID
@@ -20,10 +20,32 @@ class RatingCreateOrUpdateRequest(RatingBase):
 
 
 class Rating(RatingBase):
-    videoId: VideoID
-    userId: UserID
-    createdAt: datetime
-    updatedAt: datetime
+    """Canonical rating representation stored in the DB.
+
+    The camelCase names come from the original KillrVideo schema whereas the
+    tests (and some newer code) rely on Pythonic snake_case.  To make both
+    worlds happy we mark the canonical camelCase names and expose matching
+    snake_case *aliases* via the ``Field`` definition.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    videoId: VideoID = Field(..., alias="videoid")
+    userId: UserID = Field(..., alias="userid")
+    createdAt: datetime = Field(default_factory=lambda: datetime.now(), alias="created_at")
+    updatedAt: datetime = Field(default_factory=lambda: datetime.now(), alias="updated_at")
+
+    # ------------------------------------------------------------------
+    # Compatibility helpers
+    # ------------------------------------------------------------------
+
+    @property  # type: ignore[override]
+    def videoid(self) -> VideoID:  # noqa: N802
+        return self.videoId
+
+    @property  # type: ignore[override]
+    def userid(self) -> UserID:  # noqa: N802
+        return self.userId
 
 
 class RatingResponse(Rating):
@@ -43,4 +65,4 @@ __all__ = [
     "RatingResponse",
     "AggregateRatingResponse",
     "RatingValue",
-] 
+]

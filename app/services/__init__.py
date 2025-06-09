@@ -32,4 +32,4 @@ else:
             module = import_module(f"app.services.{name}")
             globals()[name] = module
             return module
-        raise AttributeError(name) 
+        raise AttributeError(name)
