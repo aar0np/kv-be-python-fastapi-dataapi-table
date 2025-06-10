@@ -40,7 +40,7 @@ app = FastAPI(title="KillrVideo v2 - Monolith Backend", version=settings.APP_VER
 # See: https://fastapi.tiangolo.com/tutorial/cors/
 # ---------------------------------------------------------------------------
 
-logger.debug(f"CORS origins: {settings.parsed_cors_origins}")   
+logger.debug(f"CORS origins: {settings.parsed_cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -172,6 +172,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     # This keeps the response format consistent with FastAPI's built-in validation.
     # For a custom response, you would build and return a JSONResponse here.
     from fastapi.exception_handlers import request_validation_exception_handler
+
     return await request_validation_exception_handler(request, exc)
 
 

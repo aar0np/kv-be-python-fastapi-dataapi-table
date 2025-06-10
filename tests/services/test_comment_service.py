@@ -1,12 +1,12 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from uuid import uuid4, UUID
+from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 from datetime import datetime, timezone
 
 from app.services import comment_service
-from app.models.comment import CommentCreateRequest, Comment
+from app.models.comment import CommentCreateRequest
 from app.models.user import User
-from app.models.video import Video, VideoStatusEnum, VideoID
+from app.models.video import Video, VideoStatusEnum
 
 
 @pytest.fixture

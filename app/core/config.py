@@ -18,8 +18,9 @@ _root_log_level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), loggi
 # Only configure the root logger if it hasn't been configured yet (to avoid
 # clobbering test-specific logging setups).
 if not logging.getLogger().hasHandlers():  # pragma: no cover
-    logging.basicConfig(level=_root_log_level,
-                        format="%(levelname)s:%(name)s:%(message)s")
+    logging.basicConfig(
+        level=_root_log_level, format="%(levelname)s:%(name)s:%(message)s"
+    )
 else:
     # Some other subsystem (e.g. pytest, uvicorn) already configured handlers;
     # we still honour our desired verbosity by adjusting the root level.
@@ -46,7 +47,7 @@ except NameError:
 class Settings(BaseSettings):
     # Pydantic-settings model. Populates settings from .env file and environment
     # variables.  See: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
-    
+
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
@@ -79,14 +80,14 @@ class Settings(BaseSettings):
         if raw.strip() == "*":
             return ["*"]
         origins = []
-        for o in raw.split(','):
+        for o in raw.split(","):
             o_strip = o.strip()
             if not o_strip:
                 continue
             # Normalize by removing any trailing slash so that
             # "http://localhost:8080/" and "http://localhost:8080" match.
-            if o_strip.endswith('/'):
-                o_strip = o_strip.rstrip('/')
+            if o_strip.endswith("/"):
+                o_strip = o_strip.rstrip("/")
             origins.append(o_strip)
         return origins
 

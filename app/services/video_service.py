@@ -8,10 +8,10 @@ updates, listing, etc.) will be added incrementally as the epic progresses.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import asyncio
 from typing import Optional, List, Dict, Any, Tuple
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid1
 
 from fastapi import HTTPException, status
 
@@ -41,6 +41,7 @@ LATEST_VIDEOS_TABLE_NAME: str = "latest_videos"
 VIDEO_PLAYBACK_STATS_TABLE_NAME: str = "video_playback_stats"
 VIDEO_RATINGS_TABLE_NAME: str = "video_ratings_by_user"
 VIDEO_RATINGS_SUMMARY_TABLE_NAME: str = "video_ratings"
+VIDEO_ACTIVITY_TABLE_NAME: str = "video_activity"
 
 # A collection of regex patterns that match the majority of YouTube URL formats
 # and capture the video ID in a named group called "id".
@@ -264,6 +265,7 @@ async def record_video_view(
 ) -> None:
     """Increment the view count for a video."""
 
+    # Stats counter table
     if db_table is None:
         db_table = await get_table(VIDEO_PLAYBACK_STATS_TABLE_NAME)
 
@@ -271,6 +273,19 @@ async def record_video_view(
         filter={"videoid": video_id},
         update={"$inc": {"views": 1}},
         upsert=True,
+    )
+
+    # Log individual view event in time-series activity table
+    activity_table = await get_table(VIDEO_ACTIVITY_TABLE_NAME)
+    now_utc = datetime.now(timezone.utc)
+    day_partition = now_utc.strftime("%Y-%m-%d")  # Cassandra date literal format
+
+    await activity_table.insert_one(
+        {
+            "videoid": video_id,
+            "day": day_partition,
+            "watch_time": str(uuid1()),  # time-based UUID for clustering order
+        }
     )
 
 
@@ -316,6 +331,7 @@ async def list_videos_with_query(
         docs = cursor  # type: ignore[assignment]
 
     from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
+
     try:
         total_items = await db_table.count_documents(
             filter=query_filter, upper_bound=10**9
@@ -369,6 +385,95 @@ async def list_videos_by_user(
     return await list_videos_with_query(
         query_filter, page, page_size, db_table=db_table
     )
+
+
+# ---------------------------------------------------------------------------
+# Trending
+# ---------------------------------------------------------------------------
+
+
+async def list_trending_videos(
+    interval_days: int = 1,
+    limit: int = 10,
+    activity_table: Optional[AstraDBCollection] = None,
+    videos_table: Optional[AstraDBCollection] = None,
+) -> List[VideoSummary]:
+    """Compute *trending* videos by counting `video_activity` rows in a window."""
+
+    if interval_days not in {1, 7, 30}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="interval_days must be one of 1, 7 or 30",
+        )
+
+    if limit < 1:
+        return []
+
+    if activity_table is None:
+        activity_table = await get_table(VIDEO_ACTIVITY_TABLE_NAME)
+    if videos_table is None:
+        videos_table = await get_table(VIDEOS_TABLE_NAME)
+
+    # Build list of partition keys to query (inclusive today)
+    today = datetime.now(timezone.utc).date()
+    start_date = today - timedelta(days=interval_days - 1)
+
+    partition_keys: List[str] = [
+        (start_date + timedelta(days=delta)).strftime("%Y-%m-%d")
+        for delta in range(interval_days)
+    ]
+
+    # Accumulate counts per videoid
+    view_counts: Dict[str, int] = {}
+
+    for day_key in partition_keys:
+        cursor = activity_table.find(filter={"day": day_key}, projection={"videoid": 1})
+
+        if hasattr(cursor, "to_list"):
+            day_rows = await cursor.to_list()
+        else:
+            day_rows = cursor  # type: ignore[assignment]
+
+        for row in day_rows:
+            vid = row.get("videoid")
+            if vid:
+                view_counts[vid] = view_counts.get(vid, 0) + 1
+
+    if not view_counts:
+        return []
+
+    # Keep only top N ids
+    top_video_ids = sorted(
+        view_counts.keys(), key=lambda v: view_counts[v], reverse=True
+    )[:limit]
+
+    # Fetch metadata for these videos
+    vid_cursor = videos_table.find(filter={"videoid": {"$in": top_video_ids}})
+
+    if hasattr(vid_cursor, "to_list"):
+        meta_docs = await vid_cursor.to_list()
+    else:
+        meta_docs = vid_cursor  # type: ignore[assignment]
+
+    # Map metadata by id for quick lookup
+    meta_map: Dict[str, Dict[str, Any]] = {doc["videoid"]: doc for doc in meta_docs}
+
+    # Build summaries preserving ranking
+    summaries: List[VideoSummary] = []
+    for vid in top_video_ids:
+        meta = meta_map.get(vid)
+        if not meta:
+            continue  # Skip if video metadata missing
+        summary_data = {
+            **meta,
+            "viewCount": view_counts.get(vid, 0),
+        }
+        try:
+            summaries.append(VideoSummary.model_validate(summary_data))
+        except Exception:
+            continue
+
+    return summaries
 
 
 # ---------------------------------------------------------------------------

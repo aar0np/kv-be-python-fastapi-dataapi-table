@@ -255,8 +255,6 @@ async def test_get_video_status_forbidden(viewer_user: User, viewer_token: str):
         mock_get_user.return_value = viewer_user
         mock_get_video.return_value = video
 
-        headers = {"Authorization": f"Bearer {viewer_token}"}
-
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.post(
                 f"{settings.API_V1_STR}/videos/id/{video.videoid}/view"

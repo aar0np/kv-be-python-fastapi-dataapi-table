@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 from app.main import app
 from app.core.config import settings
 from app.core.security import create_access_token
-from app.models.comment import Comment, CommentResponse
+from app.models.comment import Comment
 from app.models.user import User
 from app.models.rating import RatingResponse, AggregateRatingResponse
 
@@ -180,4 +180,4 @@ async def test_get_rating_summary_public():
             resp = await ac.get(f"{settings.API_V1_STR}/videos/{video_id}/ratings")
 
         assert resp.status_code == status.HTTP_200_OK
-        mock_get.assert_awaited_once() 
+        mock_get.assert_awaited_once()

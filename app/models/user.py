@@ -25,7 +25,9 @@ class User(UserBase):
     model_config = ConfigDict(populate_by_name=True)
 
     userid: UUID = Field(..., alias="userId")
-    created_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), alias="createdDate")
+    created_date: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), alias="createdDate"
+    )
     account_status: str = Field(default="active", alias="accountStatus")
     last_login_date: Optional[datetime] = Field(None, alias="lastLoginDate")
     roles: List[str] = []  # Populated from token, not from DB

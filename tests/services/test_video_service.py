@@ -228,13 +228,30 @@ async def test_update_video_details_no_changes():
 @pytest.mark.asyncio
 async def test_record_video_view_success():
     vid = uuid4()
-    mock_db = AsyncMock()
-    mock_db.update_one.return_value = AsyncMock()
 
-    await video_service.record_video_view(vid, mock_db)
-    mock_db.update_one.assert_called_once_with(
-        filter={"videoid": vid}, update={"$inc": {"views": 1}}, upsert=True
-    )
+    # Mock the playback stats table passed explicitly
+    mock_stats_table = AsyncMock()
+    mock_stats_table.update_one.return_value = AsyncMock()
+
+    # Mock the activity table returned via get_table
+    mock_activity_table = AsyncMock()
+
+    with patch(
+        "app.services.video_service.get_table", new_callable=AsyncMock
+    ) as mock_get_table:
+        # First call inside record_video_view is for VIDEO_PLAYBACK_STATS_TABLE_NAME
+        # but we already pass mock_stats_table, so get_table will be used only once
+        mock_get_table.return_value = mock_activity_table
+
+        await video_service.record_video_view(vid, mock_stats_table)
+
+        # Validate stats table increment
+        mock_stats_table.update_one.assert_called_once_with(
+            filter={"videoid": vid}, update={"$inc": {"views": 1}}, upsert=True
+        )
+
+        # Validate activity table log
+        mock_activity_table.insert_one.assert_called_once()
 
 
 # ------------------------------------------------------------
@@ -402,3 +419,62 @@ async def test_process_video_submission_failure(
         call_kwargs["update"]["$set"]["status"]
         == video_service.VideoStatusEnum.ERROR.value
     )
+
+
+# ------------------------------------------------------------
+# list_trending_videos
+# ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_list_trending_videos_counts_and_order():
+    """Verify that trending aggregation counts views and orders by desc."""
+
+    # Prepare mock activity documents for 2 video IDs
+    vid1, vid2 = str(uuid4()), str(uuid4())
+
+    # Suppose vid1 has 3 views, vid2 has 1 view in window
+    activity_docs_day = [
+        {"videoid": vid1},
+        {"videoid": vid2},
+        {"videoid": vid1},
+        {"videoid": vid1},
+    ]
+
+    mock_activity_table = MagicMock()
+    mock_activity_table.find.return_value = activity_docs_day
+
+    # Metadata for videos
+    video_meta_docs = [
+        {
+            "videoid": vid1,
+            "name": "Video 1",
+            "preview_image_location": "https://example.com/1.jpg",
+            "userid": str(uuid4()),
+            "added_date": datetime.now(timezone.utc),
+        },
+        {
+            "videoid": vid2,
+            "name": "Video 2",
+            "preview_image_location": "https://example.com/2.jpg",
+            "userid": str(uuid4()),
+            "added_date": datetime.now(timezone.utc),
+        },
+    ]
+
+    mock_videos_table = MagicMock()
+    mock_videos_table.find.return_value = video_meta_docs
+
+    trending = await video_service.list_trending_videos(
+        interval_days=1,
+        limit=10,
+        activity_table=mock_activity_table,
+        videos_table=mock_videos_table,
+    )
+
+    # Expect 2 items, vid1 first due to higher view count
+    assert len(trending) == 2
+    assert str(trending[0].videoid) == vid1
+    assert trending[0].viewCount == 3
+    assert str(trending[1].videoid) == vid2
+    assert trending[1].viewCount == 1

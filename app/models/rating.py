@@ -32,8 +32,12 @@ class Rating(RatingBase):
 
     videoId: VideoID = Field(..., alias="videoid")
     userId: UserID = Field(..., alias="userid")
-    createdAt: datetime = Field(default_factory=lambda: datetime.now(), alias="created_at")
-    updatedAt: datetime = Field(default_factory=lambda: datetime.now(), alias="updated_at")
+    createdAt: datetime = Field(
+        default_factory=lambda: datetime.now(), alias="created_at"
+    )
+    updatedAt: datetime = Field(
+        default_factory=lambda: datetime.now(), alias="updated_at"
+    )
 
     # ------------------------------------------------------------------
     # Compatibility helpers

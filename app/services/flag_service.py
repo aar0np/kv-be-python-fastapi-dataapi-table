@@ -123,7 +123,9 @@ async def list_flags(
     docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
 
     try:
-        total_items = await db_table.count_documents(filter=query_filter, upper_bound=10**9)
+        total_items = await db_table.count_documents(
+            filter=query_filter, upper_bound=10**9
+        )
     except TypeError:
         total_items = await db_table.count_documents(filter=query_filter)
 

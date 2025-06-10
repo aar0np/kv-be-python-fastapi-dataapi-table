@@ -4,7 +4,9 @@ import sys
 try:
     import yaml  # type: ignore
 except ImportError:  # pragma: no cover – dev helper
-    sys.stderr.write("PyYAML is required for this script. Install with `poetry add pyyaml --group dev`\n")
+    sys.stderr.write(
+        "PyYAML is required for this script. Install with `poetry add pyyaml --group dev`\n"
+    )
     sys.exit(1)
 
 from fastapi import FastAPI
@@ -25,6 +27,7 @@ output_path = pathlib.Path("docs/killrvideo_openapi.yaml")
 output_path.write_text(yaml.safe_dump(spec, sort_keys=False))
 print(f"✔ OpenAPI spec written to {output_path}")
 
+
 def main() -> None:  # Entry-point for poetry script
     """Generate docs/killrvideo_openapi.yaml from the running FastAPI app."""
 
@@ -32,5 +35,6 @@ def main() -> None:  # Entry-point for poetry script
     output_path.write_text(yaml.safe_dump(spec_dict, sort_keys=False))
     print(f"✔ OpenAPI spec written to {output_path}")
 
+
 if __name__ == "__main__":
-    main() 
+    main()

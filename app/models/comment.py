@@ -35,8 +35,12 @@ class Comment(CommentBase):
     sentiment_score: Optional[float] = None
 
     # Optional metadata fields present in some API contexts/tests
-    createdAt: Optional[datetime] = Field(default_factory=lambda: datetime.now(), alias="created_at")
-    updatedAt: Optional[datetime] = Field(default_factory=lambda: datetime.now(), alias="updated_at")
+    createdAt: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(), alias="created_at"
+    )
+    updatedAt: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(), alias="updated_at"
+    )
     sentiment: Optional[str] = None  # Free-form sentiment label used by tests
 
     # ------------------------------------------------------------------

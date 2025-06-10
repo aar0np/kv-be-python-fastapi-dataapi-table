@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional, List, Tuple, Dict, Any
-from uuid import uuid4, UUID, uuid1
+from typing import Optional, List, Tuple
+from uuid import UUID, uuid1
 
 from fastapi import HTTPException, status
 
@@ -93,9 +92,7 @@ async def list_comments_for_video(
 
     cursor = db_table.find(filter=query_filter, skip=skip, limit=page_size)
 
-    raw_docs = (
-        cursor.to_list() if hasattr(cursor, "to_list") else cursor
-    )
+    raw_docs = cursor.to_list() if hasattr(cursor, "to_list") else cursor
     docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
     try:
         total = await db_table.count_documents(filter=query_filter, upper_bound=10**9)
@@ -121,9 +118,7 @@ async def list_comments_by_user(
 
     cursor = db_table.find(filter=query_filter, skip=skip, limit=page_size)
 
-    raw_docs = (
-        cursor.to_list() if hasattr(cursor, "to_list") else cursor
-    )
+    raw_docs = cursor.to_list() if hasattr(cursor, "to_list") else cursor
     docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
     try:
         total = await db_table.count_documents(filter=query_filter, upper_bound=10**9)
@@ -157,6 +152,6 @@ async def restore_comment(comment_id: CommentID, video_id: VideoID) -> bool:
         print(f"STUB: Comment {comment_id} not found for restore.")
         return False
     print(
-        f"STUB: Restoring comment {comment_id}. Deleted: {getattr(comment,'is_deleted',False)}"
+        f"STUB: Restoring comment {comment_id}. Deleted: {getattr(comment, 'is_deleted', False)}"
     )
     return True

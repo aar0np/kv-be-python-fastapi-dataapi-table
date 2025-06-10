@@ -34,6 +34,21 @@ if "astrapy" not in sys.modules:  # pragma: no cover
     sys.modules["astrapy"] = astrapy_stub
     sys.modules["astrapy.db"] = db_stub
 
+    # Stub submodules used in code (e.g., astrapy.exceptions.data_api_exceptions)
+    exceptions_stub = types.ModuleType("astrapy.exceptions")
+
+    class _DataAPIResponseException(Exception):
+        pass
+
+    exceptions_stub.data_api_exceptions = types.ModuleType(
+        "astrapy.exceptions.data_api_exceptions"
+    )
+    exceptions_stub.data_api_exceptions.DataAPIResponseException = _DataAPIResponseException  # type: ignore[attr-defined]
+
+    # Register in sys.modules hierarchy so that "from astrapy.exceptions.data_api_exceptions" works
+    sys.modules["astrapy.exceptions"] = exceptions_stub
+    sys.modules["astrapy.exceptions.data_api_exceptions"] = exceptions_stub.data_api_exceptions
+
 # ---------------------------------------------------------------------------
 # Patch httpx.AsyncClient to accept `app` kwarg using ASGITransport (for tests)
 # ---------------------------------------------------------------------------

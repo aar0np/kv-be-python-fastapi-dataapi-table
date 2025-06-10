@@ -177,7 +177,9 @@ async def record_view(
     video = await video_service.get_video_by_id(video_id_path)
 
     if video is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
+        )
 
     is_ready = video.status == VideoStatusEnum.READY
 
@@ -196,7 +198,11 @@ async def record_view(
             except Exception:  # pragma: no cover – safety net
                 fallback_user = None  # type: ignore[assignment]
 
-            if fallback_user and "viewer" in fallback_user.roles and "moderator" not in fallback_user.roles:
+            if (
+                fallback_user
+                and "viewer" in fallback_user.roles
+                and "moderator" not in fallback_user.roles
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="User does not have permission to view this video",
@@ -342,3 +348,38 @@ async def get_related_videos_for_video(
         video_id=video_id_path, limit=limit
     )
     return related_items
+
+
+# ---------------------------------------------------------------------------
+# Trending endpoint
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/trending",
+    response_model=List[VideoSummary],
+    summary="Trending videos (top by views)",
+)
+async def get_trending_videos(
+    intervalDays: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=30,
+            description="Time window in days to consider (1, 7, or 30)",
+            examples={"one": {"summary": "1 day", "value": 1}},
+        ),
+    ] = 1,
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=10,
+            description="Maximum number of records to return (max 10)",
+        ),
+    ] = 10,
+):
+    """Return the *trending* list – most viewed videos in the selected window."""
+
+    trending_list = await video_service.list_trending_videos(intervalDays, limit)
+    return trending_list

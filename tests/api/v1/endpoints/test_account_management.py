@@ -3,11 +3,11 @@ from httpx import AsyncClient
 from fastapi import status
 from unittest.mock import patch, AsyncMock
 from uuid import uuid4
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from app.main import app
 from app.core.config import settings
-from app.models.user import User, UserCreateRequest
+from app.models.user import User
 from app.core.security import create_access_token
 
 SAMPLE_USER_ID = uuid4()
@@ -120,4 +120,4 @@ async def test_read_users_me_success():
         response_data = response.json()
         assert response_data["userId"] == str(test_user.userid)
         assert response_data["email"] == test_user.email
-        assert response_data["firstName"] == test_user.firstname 
+        assert response_data["firstName"] == test_user.firstname
