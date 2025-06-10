@@ -127,7 +127,9 @@ async def submit_new_video(
         updatedAt=now,
     )
 
-    video_doc = new_video.model_dump(by_alias=False, exclude_none=True)
+    video_doc = _prepare_video_doc(
+        new_video.model_dump(by_alias=False, exclude_none=True)
+    )
     await db_table.insert_one(document=video_doc)
     return new_video
 
@@ -168,7 +170,8 @@ async def process_video_submission(video_id: VideoID, youtube_video_id: str) -> 
 
         # Write interim processing state
         await videos_table.update_one(
-            filter={"videoid": video_id}, update={"$set": dict(update_payload)}
+            filter={"videoid": str(video_id)},
+            update={"$set": _prepare_video_doc(dict(update_payload))},
         )
 
         # Simulate lengthy processing
@@ -182,7 +185,8 @@ async def process_video_submission(video_id: VideoID, youtube_video_id: str) -> 
     final_payload = {**update_payload, "status": final_status}
 
     await videos_table.update_one(
-        filter={"videoid": video_id}, update={"$set": final_payload}
+        filter={"videoid": str(video_id)},
+        update={"$set": _prepare_video_doc(final_payload)},
     )
 
     print(
@@ -237,12 +241,14 @@ async def update_video_details(
         # Nothing to update – return original video
         return video_to_update
 
-    update_fields["updatedAt"] = datetime.now(timezone.utc)
+    # updatedAt is not part of the immutable schema – ignore.
+    update_fields_filtered = _prepare_video_doc(update_fields)
 
-    await db_table.update_one(
-        filter={"videoid": video_to_update.videoid},
-        update={"$set": update_fields},
-    )
+    if update_fields_filtered:
+        await db_table.update_one(
+            filter={"videoid": str(video_to_update.videoid)},
+            update={"$set": update_fields_filtered},
+        )
 
     # Re-fetch to get the fully updated model
     updated_video = await get_video_by_id(video_to_update.videoid, db_table)
@@ -622,3 +628,60 @@ async def restore_video(video_id: VideoID) -> bool:
         f"STUB: Restoring video {video_id}. Currently deleted: {getattr(video, 'is_deleted', False)}"
     )
     return True
+
+
+# ---------------------------------------------------------------------------
+# DB schema helpers
+# ---------------------------------------------------------------------------
+
+# The *videos* table provisioned in the demo keyspace is created up-front with
+# a *fixed* schema.  Attempting to insert or update fields that have not been
+# declared will trigger a DataAPIResponseException with code
+# ``UNKNOWN_TABLE_COLUMNS``.  To avoid runtime 500 errors we keep an explicit
+# allow-list mirroring the current schema and silently strip any keys that are
+# not present.  This still lets the application evolve (e.g., we can persist
+# richer metadata in a different collection later) while keeping the service
+# operational on the constrained table.
+
+_VIDEO_TABLE_ALLOWED_COLUMNS: set[str] = {
+    "videoid",
+    "added_date",
+    "category",
+    "content_features",
+    "content_rating",
+    "description",
+    "language",
+    "location",
+    "location_type",
+    "name",
+    "preview_image_location",
+    "tags",
+    "userid",
+}
+
+
+def _filter_video_columns(payload: Dict[str, Any]) -> Dict[str, Any]:  # noqa: D401
+    """Return a copy of *payload* containing only columns allowed by schema."""
+
+    return {k: v for k, v in payload.items() if k in _VIDEO_TABLE_ALLOWED_COLUMNS}
+
+
+def _serialize(value: Any):  # noqa: D401
+    """Convert Python objects (UUID, datetime) to JSON-serializable types."""
+
+    from uuid import UUID
+    from datetime import datetime
+
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+def _prepare_video_doc(payload: Dict[str, Any]) -> Dict[str, Any]:  # noqa: D401
+    """Filter to allowed columns and JSON-serialize supported types."""
+
+    return {
+        k: _serialize(v) for k, v in _filter_video_columns(payload).items()
+    }

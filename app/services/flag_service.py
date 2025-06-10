@@ -112,22 +112,45 @@ async def list_flags(
 
     skip = (page - 1) * page_size
 
-    cursor = db_table.find(
-        filter=query_filter,
-        skip=skip,
-        limit=page_size,
-        sort={"createdAt": -1},
-    )
-
-    raw_docs = cursor.to_list() if hasattr(cursor, "to_list") else cursor
-    docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
+    # ------------------------------------------------------------------
+    # Gracefully handle the scenario where the **flags** collection has not
+    # been created yet.  Astra will raise a ``DataAPIResponseException`` with
+    # code ``COLLECTION_NOT_EXIST`` when attempting to query a missing
+    # collection.  Instead of propagating the 500 error to the client we
+    # treat this as "no results" so that the moderation inbox simply renders
+    # an empty list until the first flag is created (which implicitly creates
+    # the collection).
+    # ------------------------------------------------------------------
 
     try:
-        total_items = await db_table.count_documents(
-            filter=query_filter, upper_bound=10**9
+        cursor = db_table.find(
+            filter=query_filter,
+            skip=skip,
+            limit=page_size,
+            sort={"createdAt": -1},
         )
-    except TypeError:
-        total_items = await db_table.count_documents(filter=query_filter)
+
+        raw_docs = cursor.to_list() if hasattr(cursor, "to_list") else cursor
+        docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
+
+        try:
+            total_items = await db_table.count_documents(
+                filter=query_filter, upper_bound=10**9
+            )
+        except TypeError:
+            # Stub collections used in tests don't accept ``upper_bound``.
+            total_items = await db_table.count_documents(filter=query_filter)
+
+    except Exception as exc:
+        # Import locally to avoid an unconditional dependency when running in
+        # environments without the real Astra client (CI).
+        from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
+
+        if isinstance(exc, DataAPIResponseException) and "COLLECTION_NOT_EXIST" in str(exc):
+            # Collection hasn't been created yet → treat as empty result set.
+            return [], 0
+        # Bubble up any other unexpected errors.
+        raise
 
     return [_to_flag_model(d) for d in docs], total_items
 
