@@ -495,6 +495,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/videos/trending:
+    get:
+      tags:
+      - Videos
+      summary: Trending videos (top by views)
+      description: "Return the *trending* list \u2013 most viewed videos in the selected\
+        \ window."
+      operationId: get_trending_videos_api_v1_videos_trending_get
+      parameters:
+      - name: intervalDays
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 30
+          minimum: 1
+          description: Time window in days to consider (1, 7, or 30)
+          examples:
+            one:
+              summary: 1 day
+              value: 1
+          default: 1
+          title: Intervaldays
+        description: Time window in days to consider (1, 7, or 30)
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 10
+          minimum: 1
+          description: Maximum number of records to return (max 10)
+          default: 10
+          title: Limit
+        description: Maximum number of records to return (max 10)
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VideoSummary'
+                title: Response Get Trending Videos Api V1 Videos Trending Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/search/videos:
     get:
       tags:
