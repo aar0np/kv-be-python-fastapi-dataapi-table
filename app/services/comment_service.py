@@ -97,7 +97,10 @@ async def list_comments_for_video(
         cursor.to_list() if hasattr(cursor, "to_list") else cursor
     )
     docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
-    total = await db_table.count_documents(filter=query_filter)
+    try:
+        total = await db_table.count_documents(filter=query_filter, upper_bound=10**9)
+    except TypeError:
+        total = await db_table.count_documents(filter=query_filter)
     return [Comment.model_validate(d) for d in docs], total
 
 
@@ -122,7 +125,10 @@ async def list_comments_by_user(
         cursor.to_list() if hasattr(cursor, "to_list") else cursor
     )
     docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
-    total = await db_table.count_documents(filter=query_filter)
+    try:
+        total = await db_table.count_documents(filter=query_filter, upper_bound=10**9)
+    except TypeError:
+        total = await db_table.count_documents(filter=query_filter)
     return [Comment.model_validate(d) for d in docs], total
 
 

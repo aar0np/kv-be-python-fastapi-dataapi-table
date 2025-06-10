@@ -25,6 +25,7 @@ mypy = "^1.16.0"
 ruff = "^0.11.12"
 email-validator = "^2.2.0"
 pyyaml = {version = "^6.0", optional = false}
+python-dotenv = "^1.1.0"
 
 [build-system]
 requires = ["poetry-core"]

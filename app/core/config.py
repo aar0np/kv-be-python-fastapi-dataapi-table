@@ -1,8 +1,58 @@
-from pydantic_settings import BaseSettings
+import pathlib
+import os
+import logging
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.version import __version__ as app_version
+
+# --------------------------------------------------------------
+# Root logging configuration
+# --------------------------------------------------------------
+# Honour a LOG_LEVEL environment variable (default INFO) so that running e.g.
+#   $ export LOG_LEVEL=DEBUG
+# surfaces debug-level log lines from all project modules without requiring a
+# custom uvicorn logging config.  We set this up before the rest of the app is
+# imported to ensure it governs all subsequent logger instances.
+
+_root_log_level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
+
+# Only configure the root logger if it hasn't been configured yet (to avoid
+# clobbering test-specific logging setups).
+if not logging.getLogger().hasHandlers():  # pragma: no cover
+    logging.basicConfig(level=_root_log_level,
+                        format="%(levelname)s:%(name)s:%(message)s")
+else:
+    # Some other subsystem (e.g. pytest, uvicorn) already configured handlers;
+    # we still honour our desired verbosity by adjusting the root level.
+    logging.getLogger().setLevel(_root_log_level)
+
+# Build a definitive, absolute path to the .env file.
+# This starts from the location of THIS file (config.py) and walks up
+# the directory tree to the project root, then appends ".env".
+# This makes loading the .env file completely independent of the
+# current working directory, which is essential for `uvicorn --reload`.
+try:
+    _project_root = pathlib.Path(__file__).parent.parent.parent
+    _ENV_FILE = _project_root / ".env"
+    logging.debug(f"Looking for .env file at {_ENV_FILE}")
+    if not _ENV_FILE.is_file():
+        # Fallback for safety, though it shouldn't be needed with this logic.
+        _ENV_FILE = ".env"
+        logging.warning(f"No .env file found at {_ENV_FILE}, using default .env file")
+except NameError:
+    _ENV_FILE = ".env"
+    logging.warning(f"No .env file found at {_ENV_FILE}, using default .env file")
 
 
 class Settings(BaseSettings):
+    # Pydantic-settings model. Populates settings from .env file and environment
+    # variables.  See: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
+    
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE,
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
+
     PROJECT_NAME: str = "KillrVideo Python FastAPI Backend"
     API_V1_STR: str = "/api/v1"
 
@@ -28,13 +78,20 @@ class Settings(BaseSettings):
         raw = self.CORS_ALLOW_ORIGINS
         if raw.strip() == "*":
             return ["*"]
-        return [o.strip() for o in raw.split(",") if o.strip()]
+        origins = []
+        for o in raw.split(','):
+            o_strip = o.strip()
+            if not o_strip:
+                continue
+            # Normalize by removing any trailing slash so that
+            # "http://localhost:8080/" and "http://localhost:8080" match.
+            if o_strip.endswith('/'):
+                o_strip = o_strip.rstrip('/')
+            origins.append(o_strip)
+        return origins
 
     # Application build version (surfaced in OpenAPI docs)
     APP_VERSION: str = app_version
-
-    class Config:
-        env_file = ".env"
 
 
 settings = Settings()

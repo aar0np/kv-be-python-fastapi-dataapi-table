@@ -97,6 +97,24 @@ async def create_user_in_table(
         "account_locked": False,
     }
 
+    # ------------------------------------------------------------------
+    # Data API requires primitive JSON types. Convert UUID -> str and
+    # datetime -> ISO-8601 before persisting to Astra.
+    # ------------------------------------------------------------------
+
+    def _serialize(value):  # noqa: D401 – internal helper
+        from uuid import UUID
+        from datetime import datetime
+
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return value
+
+    user_document = {k: _serialize(v) for k, v in user_document.items()}
+    credentials_document = {k: _serialize(v) for k, v in credentials_document.items()}
+
     await users_table.insert_one(document=user_document)
     await credentials_table.insert_one(document=credentials_document)
 
@@ -215,33 +233,45 @@ async def search_users(
     # collection cursors as well as various unittest.mock.AsyncMock setups.
     # ------------------------------------------------------------------
 
-    result = table.find(filter=query_filter, limit=limit)
+    from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
 
-    docs: List[dict]
+    docs: List[dict] = []
 
-    if isinstance(result, list):
-        # Tests may stub .find() to return a plain list already
-        docs = result
-    elif hasattr(result, "to_list"):
-        # Official astrapy cursor as well as many mocks expose `.to_list()`
-        docs = await result.to_list()  # type: ignore[attr-defined]
-    elif inspect.isawaitable(result):
-        # The call itself returned an awaitable (common with AsyncMock).  The
-        # awaited value is typically a *cursor*-like object.  If that object
-        # exposes `.to_list()` we invoke it, otherwise we try to treat it as a
-        # sequence directly.
+    try:
+        result = table.find(filter=query_filter, limit=limit)
 
-        awaited_obj = await result  # type: ignore[assignment]
-
-        if hasattr(awaited_obj, "to_list"):
-            docs = await awaited_obj.to_list()  # type: ignore[attr-defined]
-        elif isinstance(awaited_obj, list):
-            docs = awaited_obj
+        if isinstance(result, list):
+            docs = result
+        elif hasattr(result, "to_list"):
+            docs = await result.to_list()  # type: ignore[attr-defined]
+        elif inspect.isawaitable(result):
+            docs = await result  # type: ignore[assignment]
         else:
-            docs = list(awaited_obj) if awaited_obj is not None else []
-    else:
-        # As a last resort, attempt to cast to list (could be iterable)
-        docs = list(result) if result is not None else []
+            docs = list(result) if result is not None else []
+    except DataAPIResponseException as exc:
+        # Astra table does not support $regex – fallback to client-side substring match.
+        if "UNSUPPORTED_FILTER_OPERATION" in str(exc):
+            # Fetch a broader set (bounded by `limit * 5` to avoid huge scans)
+            raw_cursor = table.find(filter={}, limit=limit * 5)
+            raw_docs = (
+                await raw_cursor.to_list()
+                if hasattr(raw_cursor, "to_list")
+                else raw_cursor
+            )
+
+            lower_q = query.lower() if query else ""
+
+            def _match(d: dict) -> bool:  # noqa: D401
+                if not lower_q:
+                    return True
+                return any(
+                    lower_q in str(d.get(f)).lower()
+                    for f in ("email", "firstname", "lastname")
+                )
+
+            docs = [d for d in raw_docs if _match(d)][:limit]
+        else:
+            raise
 
     return [User.model_validate(d) for d in docs]
 

@@ -122,7 +122,10 @@ async def list_flags(
     raw_docs = cursor.to_list() if hasattr(cursor, "to_list") else cursor
     docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
 
-    total_items = await db_table.count_documents(filter=query_filter)
+    try:
+        total_items = await db_table.count_documents(filter=query_filter, upper_bound=10**9)
+    except TypeError:
+        total_items = await db_table.count_documents(filter=query_filter)
 
     return [_to_flag_model(d) for d in docs], total_items
 

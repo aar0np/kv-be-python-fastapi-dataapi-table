@@ -12,7 +12,9 @@ import logging
 from http import HTTPStatus
 
 from fastapi import FastAPI, HTTPException, Request, status, APIRouter
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.astra_client import init_astra_db
@@ -30,7 +32,23 @@ from app.api.v1.endpoints import (
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="KillrVideo 2025 - Monolith Backend", version=settings.APP_VERSION)
+app = FastAPI(title="KillrVideo v2 - Monolith Backend", version=settings.APP_VERSION)
+
+# ---------------------------------------------------------------------------
+# CORS middleware
+#
+# See: https://fastapi.tiangolo.com/tutorial/cors/
+# ---------------------------------------------------------------------------
+
+logger.debug(f"CORS origins: {settings.parsed_cors_origins}")   
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.parsed_cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # API router for v1
 api_router_v1 = APIRouter(prefix=settings.API_V1_STR)
@@ -102,6 +120,13 @@ if HttpxConnectError is not None:
     @app.exception_handler(HttpxConnectError)  # type: ignore[arg-type]
     async def httpx_connect_error_handler(request: Request, exc: Exception):  # noqa: D401
         logger.warning("AstraDB connectivity problem: %s", exc)
+        # Provide more context for troubleshooting: log the failed request (if
+        # available) and the full stack trace at DEBUG level.
+        if hasattr(exc, "request") and exc.request is not None:  # pragma: no cover
+            logger.debug(
+                "Failed AstraDB request – %s %s", exc.request.method, exc.request.url
+            )
+        logger.debug("Detailed stack trace for connectivity issue:", exc_info=True)
         return await _problem_response(
             request,
             status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -114,6 +139,9 @@ if HttpcoreConnectError is not None:
     @app.exception_handler(HttpcoreConnectError)  # type: ignore[arg-type]
     async def httpcore_connect_error_handler(request: Request, exc: Exception):  # noqa: D401
         logger.warning("AstraDB connectivity problem: %s", exc)
+        # httpcore.ConnectError does not expose the original request object, but we
+        # still output the stack trace to aid debugging.
+        logger.debug("Detailed stack trace for connectivity issue:", exc_info=True)
         return await _problem_response(
             request,
             status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -134,6 +162,17 @@ async def generic_exception_handler(request: Request, exc: Exception):
             instance=str(request.url),
         ).model_dump(exclude_none=True),
     )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log validation errors and return a default 422 response."""
+    logger.error("Request validation failed: %s", exc.errors())
+    # Re-raise the original exception to let FastAPI handle the default response
+    # This keeps the response format consistent with FastAPI's built-in validation.
+    # For a custom response, you would build and return a JSONResponse here.
+    from fastapi.exception_handlers import request_validation_exception_handler
+    return await request_validation_exception_handler(request, exc)
 
 
 @app.get("/", summary="Health check")

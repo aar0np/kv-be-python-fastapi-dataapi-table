@@ -72,10 +72,9 @@ except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
             """Compatibility shim for astrapy v2."""
 
             def __init__(self, *, api_endpoint: str, token: str, namespace: str):
-                client = DataAPIClient()
+                client = DataAPIClient(token=token)
                 self._db = client.get_async_database(
                     api_endpoint,
-                    token=token,
                     keyspace=namespace,
                 )
 
@@ -109,6 +108,14 @@ async def init_astra_db():
         logger.info(
             f"Initializing AstraDB client for keyspace: {settings.ASTRA_DB_KEYSPACE} at {settings.ASTRA_DB_API_ENDPOINT[:30]}..."
         )  # Log only part of endpoint
+        # Extra debug information to help diagnose connectivity problems. The token
+        # is intentionally truncated to avoid leaking secrets in logs.
+        logger.debug(
+            "AstraDB connection settings – endpoint=%s | keyspace=%s | token_prefix=%s…",
+            settings.ASTRA_DB_API_ENDPOINT,
+            settings.ASTRA_DB_KEYSPACE,
+            settings.ASTRA_DB_APPLICATION_TOKEN[:8],
+        )
         # The concrete class of `AstraDB` depends on the import section above
         # (legacy vs. v2).  Both variants share the same constructor signature
         # thanks to the wrapper defined for v2.

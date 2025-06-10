@@ -315,7 +315,14 @@ async def list_videos_with_query(
     else:  # Stub collection path
         docs = cursor  # type: ignore[assignment]
 
-    total_items = await db_table.count_documents(filter=query_filter)
+    from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
+    try:
+        total_items = await db_table.count_documents(
+            filter=query_filter, upper_bound=10**9
+        )
+    except (TypeError, DataAPIResponseException):
+        # Unsupported on tables or running against stub – use docs length
+        total_items = len(docs)
 
     summaries: List[VideoSummary] = [VideoSummary.model_validate(d) for d in docs]
 
@@ -343,7 +350,6 @@ async def list_videos_by_tag(
     db_table: Optional[AstraDBCollection] = None,
 ) -> Tuple[List[VideoSummary], int]:
     query_filter = {
-        "status": VideoStatusEnum.READY,
         "tags": {"$in": [tag]},
     }
     return await list_videos_with_query(
@@ -358,7 +364,6 @@ async def list_videos_by_user(
     db_table: Optional[AstraDBCollection] = None,
 ) -> Tuple[List[VideoSummary], int]:
     query_filter = {
-        "status": VideoStatusEnum.READY,
         "userid": str(user_id),
     }
     return await list_videos_with_query(
@@ -441,7 +446,6 @@ async def search_videos_by_keyword(
 
     escaped = re.escape(query)
     search_filter: Dict[str, Any] = {
-        "status": VideoStatusEnum.READY.value,
         "$or": [
             {"name": {"$regex": escaped, "$options": "i"}},
             {"description": {"$regex": escaped, "$options": "i"}},
@@ -476,7 +480,6 @@ async def suggest_tags(
     # Fetch tags field from a subset of recent videos
     cursor = db_table.find(
         filter={
-            "status": VideoStatusEnum.READY.value,
             "tags": {"$exists": True},
         },
         projection={"tags": 1},
