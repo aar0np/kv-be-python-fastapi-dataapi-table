@@ -46,10 +46,27 @@ class VideoBase(BaseModel):
     tags: List[str] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# Submit request model – now allows the client to send the title
+# ---------------------------------------------------------------------------
+
+
 class VideoSubmitRequest(BaseModel):
-    """Payload accepted by the *submit video* endpoint."""
+    """Payload accepted by the *submit video* endpoint.
+
+    The **title** is optional – if the client already looked it up via the
+    preview endpoint it can pass it here so the user immediately sees the
+    correct name instead of the temporary placeholder.
+    """
 
     youtubeUrl: HttpUrl = Field(..., alias="youtubeUrl")
+    title: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=150,
+        alias="title",
+        description="Optional video title obtained from the preview step.",
+    )
 
 
 class Video(VideoBase):
@@ -174,6 +191,17 @@ class TagSuggestion(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Preview model (title only)
+# ---------------------------------------------------------------------------
+
+
+class VideoPreviewResponse(BaseModel):
+    """Response model used by the *preview* endpoint to pre-fill UI fields."""
+
+    title: str
+
+
+# ---------------------------------------------------------------------------
 # dunder
 # ---------------------------------------------------------------------------
 __all__ = [
@@ -189,6 +217,7 @@ __all__ = [
     "VideoRatingRequest",
     "VideoRatingSummary",
     "TagSuggestion",
+    "VideoPreviewResponse",
 ]
 
 # Ensure the full Video model also exposes camelCase aliases where useful.

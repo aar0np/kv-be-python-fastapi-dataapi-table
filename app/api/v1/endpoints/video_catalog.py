@@ -25,6 +25,7 @@ from app.models.video import (
     VideoSummary,
     VideoRatingRequest,
     VideoRatingSummary,
+    VideoPreviewResponse,
 )
 from app.models.user import User
 from app.api.v1.dependencies import (
@@ -383,3 +384,27 @@ async def get_trending_videos(
 
     trending_list = await video_service.list_trending_videos(intervalDays, limit)
     return trending_list
+
+
+# ---------------------------------------------------------------------------
+# Preview endpoint – fetch title for a YouTube URL (lightweight)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/preview",
+    response_model=VideoPreviewResponse,
+    summary="Preview YouTube URL (title only)",
+)
+async def preview_youtube_video(
+    request: VideoSubmitRequest,
+):
+    """Return the title of the supplied YouTube video.
+
+    No authentication required – the client uses this to pre-fill the *Name*
+    field when submitting a new video.  All heavy-lifting stays backend-side so
+    we avoid CORS issues and leaking any API keys.
+    """
+
+    title = await video_service.fetch_video_title(str(request.youtubeUrl))
+    return VideoPreviewResponse(title=title)
