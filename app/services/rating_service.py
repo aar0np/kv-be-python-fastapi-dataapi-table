@@ -18,8 +18,10 @@ from app.models.rating import (
 from app.models.video import VideoID, VideoStatusEnum
 from app.models.user import User
 from app.services import video_service
+from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
 
-RATINGS_TABLE_NAME = "ratings"
+RATINGS_TABLE_NAME = video_service.VIDEO_RATINGS_TABLE_NAME  # "video_ratings_by_user"
+RATINGS_SUMMARY_TABLE_NAME = video_service.VIDEO_RATINGS_SUMMARY_TABLE_NAME
 
 
 async def _update_video_aggregate_rating(
@@ -30,7 +32,7 @@ async def _update_video_aggregate_rating(
     """Recalculate average and total ratings count for the given video."""
 
     cursor = ratings_db_table.find(
-        filter={"videoId": str(video_id)}, projection={"rating": 1}
+        filter={"videoid": str(video_id)}, projection={"rating": 1}
     )
     docs: List[Dict[str, Any]] = (
         await cursor.to_list() if hasattr(cursor, "to_list") else cursor
@@ -44,16 +46,25 @@ async def _update_video_aggregate_rating(
         total = 0
         average = None
 
-    await videos_db_table.update_one(
-        filter={"videoId": str(video_id)},
-        update={
-            "$set": {
-                "averageRating": average,
-                "totalRatingsCount": total,
-                "updatedAt": datetime.now(timezone.utc),
-            }
-        },
-    )
+    try:
+        await videos_db_table.update_one(
+            filter={"videoid": str(video_id)},
+            update={
+                "$set": {
+                    "averageRating": average,
+                    "totalRatingsCount": total,
+                    "updatedAt": datetime.now(timezone.utc),
+                }
+            },
+        )
+    except DataAPIResponseException as exc:
+        # If the videos table schema does not include these columns (common
+        # when running against the default KillrVideo schema) Astra will
+        # reject the update with UNKNOWN_TABLE_COLUMNS.  That is not fatal –
+        # the API can still compute aggregates on-the-fly.
+        if "UNKNOWN_TABLE_COLUMNS" not in str(exc):
+            raise
+        # Otherwise silently ignore so the rating operation succeeds.
 
 
 async def rate_video(
@@ -63,28 +74,40 @@ async def rate_video(
     db_table: Optional[AstraDBCollection] = None,
 ) -> Rating:
     target_video = await video_service.get_video_by_id(video_id)
-    if target_video is None or target_video.status != VideoStatusEnum.READY:
+    if target_video is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video not found or not available for rating",
+            detail="Video not found",
+        )
+
+    # Videos persisted through the fallback path often lack a ``status`` column
+    # (the table schema has no such column).  In that scenario Pydantic fills
+    # the attribute with its default (PENDING). We consider *absence* of the
+    # field equivalent to READY so that legacy/legacy-imported videos remain
+    # rateable.
+    status_in_doc = "status" in getattr(target_video, "model_fields_set", set())
+    if target_video.status != VideoStatusEnum.READY and status_in_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not available for rating",
         )
 
     if db_table is None:
         db_table = await get_table(RATINGS_TABLE_NAME)
 
     now = datetime.now(timezone.utc)
-    rating_filter = {"videoId": str(video_id), "userId": str(current_user.userId)}
+    rating_filter = {"videoid": str(video_id), "userid": str(current_user.userid)}
     existing_doc = await db_table.find_one(filter=rating_filter)
 
     if existing_doc:
         await db_table.update_one(
             filter=rating_filter,
-            update={"$set": {"rating": request.rating, "updatedAt": now}},
+            update={"$set": {"rating": request.rating, "rating_date": now}},
         )
-        created_at = existing_doc.get("createdAt", now)
+        created_at = existing_doc.get("rating_date", now)
         rating_obj = Rating(
             videoId=video_id,
-            userId=current_user.userId,
+            userId=current_user.userid,
             rating=request.rating,
             createdAt=created_at,
             updatedAt=now,
@@ -92,14 +115,17 @@ async def rate_video(
     else:
         rating_obj = Rating(
             videoId=video_id,
-            userId=current_user.userId,
+            userId=current_user.userid,
             rating=request.rating,
             createdAt=now,
             updatedAt=now,
         )
-        insert_doc = rating_obj.model_dump()
-        insert_doc["videoId"] = str(insert_doc["videoId"])
-        insert_doc["userId"] = str(insert_doc["userId"])
+        insert_doc = {
+            "videoid": str(video_id),
+            "userid": str(current_user.userid),
+            "rating": request.rating,
+            "rating_date": now,
+        }
         await db_table.insert_one(document=insert_doc)
 
     # update aggregate
@@ -137,7 +163,7 @@ async def get_video_ratings_summary(
             ratings_db_table = await get_table(RATINGS_TABLE_NAME)
 
         doc = await ratings_db_table.find_one(
-            filter={"videoId": str(video_id), "userId": str(current_user_id)},
+            filter={"videoid": str(video_id), "userid": str(current_user_id)},
             projection={"rating": 1},
         )
         if doc and "rating" in doc:

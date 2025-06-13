@@ -546,6 +546,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/videos/preview:
+    post:
+      tags:
+      - Videos
+      summary: Preview YouTube URL (title only)
+      description: "Return the title of the supplied YouTube video.\n\nNo authentication\
+        \ required \u2013 the client uses this to pre-fill the *Name*\nfield when\
+        \ submitting a new video.  All heavy-lifting stays backend-side so\nwe avoid\
+        \ CORS issues and leaking any API keys."
+      operationId: preview_youtube_video_api_v1_videos_preview_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoSubmitRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/search/videos:
     get:
       tags:
@@ -1271,6 +1300,16 @@ components:
           - type: number
           - type: 'null'
           title: Sentiment Score
+        firstName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Firstname
+        lastName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lastname
       type: object
       required:
       - commentid
@@ -1863,9 +1902,9 @@ components:
         status:
           $ref: '#/components/schemas/VideoStatusEnum'
           default: PENDING
-        viewCount:
+        views:
           type: integer
-          title: Viewcount
+          title: Views
           default: 0
         averageRating:
           anyOf:
@@ -1895,6 +1934,16 @@ components:
       - location_type
       title: VideoDetailResponse
       description: Response model returned when fetching full video details.
+    VideoPreviewResponse:
+      properties:
+        title:
+          type: string
+          title: Title
+      type: object
+      required:
+      - title
+      title: VideoPreviewResponse
+      description: Response model used by the *preview* endpoint to pre-fill UI fields.
     VideoRatingRequest:
       properties:
         rating:
@@ -1957,11 +2006,22 @@ components:
           minLength: 1
           format: uri
           title: Youtubeurl
+        title:
+          anyOf:
+          - type: string
+            maxLength: 150
+            minLength: 1
+          - type: 'null'
+          title: Title
+          description: Optional video title obtained from the preview step.
       type: object
       required:
       - youtubeUrl
       title: VideoSubmitRequest
-      description: Payload accepted by the *submit video* endpoint.
+      description: "Payload accepted by the *submit video* endpoint.\n\nThe **title**\
+        \ is optional \u2013 if the client already looked it up via the\npreview endpoint\
+        \ it can pass it here so the user immediately sees the\ncorrect name instead\
+        \ of the temporary placeholder."
     VideoSummary:
       properties:
         videoId:
@@ -1997,9 +2057,9 @@ components:
           - type: string
           - type: 'null'
           title: Category
-        viewCount:
+        views:
           type: integer
-          title: Viewcount
+          title: Views
           default: 0
         averageRating:
           anyOf:

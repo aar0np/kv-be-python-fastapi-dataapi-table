@@ -10,6 +10,7 @@ from app.models.video import VideoID
 from app.models.user import User
 from app.api.v1.dependencies import (
     get_current_viewer,
+    get_current_user_from_token,
     PaginationParams,
     get_current_user_optional,
 )
@@ -103,7 +104,7 @@ async def list_comments_user(
 async def post_rating_video(
     video_id_path: VideoID,
     rating_data: RatingCreateOrUpdateRequest,
-    current_user: Annotated[User, Depends(get_current_viewer)],
+    current_user: Annotated[User, Depends(get_current_user_from_token)],
 ):
     """Upsert a rating (1-5) for the specified video by the current viewer."""
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, Field, ConfigDict
@@ -36,10 +36,10 @@ class Comment(CommentBase):
 
     # Optional metadata fields present in some API contexts/tests
     createdAt: Optional[datetime] = Field(
-        default_factory=lambda: datetime.now(), alias="created_at"
+        default_factory=lambda: datetime.now(timezone.utc), alias="created_at"
     )
     updatedAt: Optional[datetime] = Field(
-        default_factory=lambda: datetime.now(), alias="updated_at"
+        default_factory=lambda: datetime.now(timezone.utc), alias="updated_at"
     )
     sentiment: Optional[str] = None  # Free-form sentiment label used by tests
 
@@ -84,6 +84,10 @@ class CommentResponse(BaseModel):
     userId: UserID = Field(..., alias="userid")
     text: str = Field(..., alias="comment")
     sentimentScore: Optional[float] = Field(None, alias="sentiment_score")
+
+    # Author metadata – populated by service layer when enrichment is enabled
+    firstname: Optional[str] = Field(None, alias="firstName")
+    lastname: Optional[str] = Field(None, alias="lastName")
 
 
 __all__ = [

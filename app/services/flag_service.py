@@ -146,7 +146,9 @@ async def list_flags(
         # environments without the real Astra client (CI).
         from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
 
-        if isinstance(exc, DataAPIResponseException) and "COLLECTION_NOT_EXIST" in str(exc):
+        if isinstance(exc, DataAPIResponseException) and "COLLECTION_NOT_EXIST" in str(
+            exc
+        ):
             # Collection hasn't been created yet → treat as empty result set.
             return [], 0
         # Bubble up any other unexpected errors.

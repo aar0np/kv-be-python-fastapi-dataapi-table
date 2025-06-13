@@ -31,6 +31,7 @@ def test_settings_default_value():
     # We can achieve this by temporarily disabling .env loading or using a non-existent .env file path
 
     from app.core.config import Settings
+
     # Instantiate settings without relying on a .env file for this specific test
     # This requires Pydantic settings to allow ignoring .env if specified
     # or by ensuring no .env file exists that pytest can see.

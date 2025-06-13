@@ -322,3 +322,51 @@ async def revoke_role_from_user(
         )
 
     return user
+
+
+# ---------------------------------------------------------------------------
+# Bulk helpers (used by comment enrichment)
+# ---------------------------------------------------------------------------
+
+
+async def get_users_by_ids(
+    user_ids: List[UUID],
+    db_table: Optional[AstraDBCollection] = None,
+) -> Dict[UUID, User]:
+    """Return a mapping {user_id → User} for the supplied IDs.
+
+    The helper first attempts a single `$in` query for efficiency.  When the
+    underlying Astra *table* rejects that operator (UNSUPPORTED_FILTER_OPERATION)
+    we gracefully fall back to issuing the look-ups in parallel.
+    """
+
+    # Early-out: no IDs ⇒ empty mapping
+    if not user_ids:
+        return {}
+
+    # Ensure uniqueness and string form for the driver
+    ids_str: List[str] = list({str(u) for u in user_ids})
+
+    table = db_table if db_table is not None else await get_table(USERS_TABLE_NAME)
+
+    from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
+    import asyncio
+
+    docs: List[dict]
+    try:
+        cursor = table.find(filter={"userid": {"$in": ids_str}}, limit=len(ids_str))
+        raw_docs = cursor.to_list() if hasattr(cursor, "to_list") else cursor
+        docs = await raw_docs if inspect.isawaitable(raw_docs) else raw_docs
+    except DataAPIResponseException as exc:
+        # Some Astra **tables** reject $in – fall back to individual fetches.
+        if "UNSUPPORTED_FILTER_OPERATION" in str(exc):
+
+            async def _fetch_one(uid: str):  # noqa: D401 – small helper
+                return await table.find_one(filter={"userid": uid})
+
+            results = await asyncio.gather(*[_fetch_one(uid) for uid in ids_str])
+            docs = [d for d in results if d]
+        else:
+            raise
+
+    return {UUID(d["userid"]): User.model_validate(d) for d in docs}

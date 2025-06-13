@@ -39,9 +39,7 @@ def _build_paginated_flags(
         for item in flags
     ]
     total_pages = (total + pagination.pageSize - 1) // pagination.pageSize
-    return PaginatedResponse[
-        FlagResponse  # type: ignore[misc]
-    ](
+    return PaginatedResponse[FlagResponse](  # type: ignore[misc]
         data=coerced,
         pagination=Pagination(
             currentPage=pagination.page,

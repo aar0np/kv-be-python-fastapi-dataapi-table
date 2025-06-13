@@ -91,7 +91,8 @@ CREATE TABLE IF NOT EXISTS killrvideo.videos (
     userid uuid,
     content_rating text,                         -- 'G', 'PG', 'PG-13', 'R', etc.
     category text,
-    language text
+    language text,      -- Added as a workaround from data API and the lack of counter support 
+    views bigint
 );
 
 -- SAI indexes for the videos table

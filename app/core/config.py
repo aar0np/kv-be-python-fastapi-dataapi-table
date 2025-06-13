@@ -3,6 +3,8 @@ import os
 import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.version import __version__ as app_version
+from pydantic import Field
+from pydantic import model_validator
 
 # --------------------------------------------------------------
 # Root logging configuration
@@ -93,6 +95,48 @@ class Settings(BaseSettings):
 
     # Application build version (surfaced in OpenAPI docs)
     APP_VERSION: str = app_version
+
+    ENVIRONMENT: str = Field(default="dev")
+
+    # ------------------------------------------------------------------
+    # Video metadata processing toggles (used by video_service)
+    # ------------------------------------------------------------------
+
+    INLINE_METADATA_DISABLED: bool = False
+    ENABLE_BACKGROUND_PROCESSING: bool = True
+
+    # ------------------------------------------------------------------
+    # YouTube integration
+    # ------------------------------------------------------------------
+
+    YOUTUBE_API_KEY: str | None = Field(
+        default=None,
+        description="API key for YouTube Data API v3. If unset, service falls back to oEmbed.",
+    )
+
+    YOUTUBE_API_TIMEOUT: float = Field(
+        default=3.0,
+        description="Timeout (seconds) for outbound YouTube HTTP requests.",
+        ge=0.5,
+    )
+
+    # ------------------------------------------------------------------
+    # Pydantic hook: coerce boolean env vars that may carry inline
+    # descriptors (e.g. "false   # keep inline fetch") coming from env
+    # files.  We strip everything after the first whitespace/# so the
+    # builtin bool parser sees a clean "true" / "false" token.
+    # ------------------------------------------------------------------
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sanitize_bool_tokens(cls, data):  # type: ignore[return-value]
+        for key in ("INLINE_METADATA_DISABLED", "ENABLE_BACKGROUND_PROCESSING"):
+            if key in data and isinstance(data[key], str):
+                raw = data[key]
+                # Split at first whitespace or '#'
+                token = raw.split("#", 1)[0].strip().split()[0]
+                data[key] = token
+        return data
 
 
 settings = Settings()

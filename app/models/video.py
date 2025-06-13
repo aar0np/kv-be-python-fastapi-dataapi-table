@@ -91,7 +91,9 @@ class Video(VideoBase):
     youtubeVideoId: Optional[str] = None
     updatedAt: Optional[datetime] = None
     status: VideoStatusEnum = VideoStatusEnum.PENDING
-    viewCount: int = 0
+    # Persisted as ``views`` in the *videos* table but still exposed to
+    # callers as ``viewCount`` for backward-compatibility.
+    viewCount: int = Field(0, alias="views")
     averageRating: Optional[float] = None
     totalRatingsCount: int = 0
     is_deleted: bool = False
@@ -139,7 +141,8 @@ class VideoSummary(BaseModel):
     category: Optional[str] = None
 
     # Fields not in latest_videos schema
-    viewCount: int = 0
+    # Same aliasing logic for the compact summary representation
+    viewCount: int = Field(0, alias="views")
     averageRating: Optional[float] = None
 
     # ------------------------------------------------------------------
