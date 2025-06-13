@@ -94,6 +94,35 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - OAuth2PasswordBearer: []
+  /api/v1/users/{user_id_path}:
+    get:
+      tags:
+      - Users
+      summary: Public user profile by ID
+      description: Return basic user info (firstname, lastname, email, etc.) for a
+        given UUID.
+      operationId: get_user_by_id_api_v1_users__user_id_path__get
+      parameters:
+      - name: user_id_path
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/videos:
     post:
       tags:

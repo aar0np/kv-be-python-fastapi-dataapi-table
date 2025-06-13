@@ -15,6 +15,7 @@ from app.services import video_service, user_service
 from app.external_services.sentiment_mock import MockSentimentAnalyzer
 import inspect  # local import to avoid new dependency
 from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
+from app.utils.db_helpers import safe_count
 
 # testing mocks
 from unittest.mock import AsyncMock, MagicMock
@@ -159,15 +160,11 @@ async def list_comments_for_video(
         if "comment" in d and "text" not in d:
             d["text"] = d["comment"]
 
-    try:
-        total = await db_table.count_documents(filter=query_filter, upper_bound=10**9)
-    except (TypeError, DataAPIResponseException) as exc:
-        if isinstance(
-            exc, DataAPIResponseException
-        ) and "UNSUPPORTED_TABLE_COMMAND" in str(exc):
-            total = len(docs)
-        else:
-            total = await db_table.count_documents(filter=query_filter)
+    total = await safe_count(
+        db_table,
+        query_filter=query_filter,
+        fallback_len=len(docs),
+    )
 
     # Build Comment models, then enrich with author names
     comment_models = [Comment.model_validate(d) for d in docs]
@@ -207,15 +204,11 @@ async def list_comments_by_user(
         if "comment" in d and "text" not in d:
             d["text"] = d["comment"]
 
-    try:
-        total = await db_table.count_documents(filter=query_filter, upper_bound=10**9)
-    except (TypeError, DataAPIResponseException) as exc:
-        if isinstance(
-            exc, DataAPIResponseException
-        ) and "UNSUPPORTED_TABLE_COMMAND" in str(exc):
-            total = len(docs)
-        else:
-            total = await db_table.count_documents(filter=query_filter)
+    total = await safe_count(
+        db_table,
+        query_filter=query_filter,
+        fallback_len=len(docs),
+    )
 
     comment_models = [Comment.model_validate(d) for d in docs]
 

@@ -13,6 +13,7 @@ from app.models.user import (
 from app.services import user_service
 from app.core.security import create_access_token
 from app.api.v1.dependencies import get_current_viewer
+from uuid import UUID
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -77,3 +78,26 @@ async def update_users_me(
             detail="User not found for update, this should not happen if token is valid.",
         )
     return updated_user
+
+
+# ---------------------------------------------------------------------------
+# Public user lookup (by ID) – enables /api/v1/users/{userId}
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{user_id_path:uuid}",
+    response_model=User,
+    summary="Public user profile by ID",
+)
+async def get_user_by_id(user_id_path: UUID):
+    """Return basic user info (firstname, lastname, email, etc.) for a given UUID."""
+
+    user_obj = await user_service.get_user_by_id_from_table(user_id=user_id_path)
+
+    if user_obj is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    return user_obj

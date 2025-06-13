@@ -297,6 +297,11 @@ async def get_video_by_id(
     if doc is None:
         return None
 
+    # If the status column is missing (older rows), assume the video is READY so
+    # downstream services such as comments work as expected.
+    if "status" not in doc:
+        doc["status"] = VideoStatusEnum.READY.value
+
     # ------------------------------------------------------------------
     # Backfill missing YouTube ID so the API always returns a usable value
     # for the `youtubeVideoId` field required by the frontend player.
@@ -448,13 +453,14 @@ async def list_videos_with_query(
     else:  # Stub collection path
         docs = cursor  # type: ignore[assignment]
 
-    try:
-        total_items = await db_table.count_documents(
-            filter=query_filter, upper_bound=10**9
-        )
-    except (TypeError, DataAPIResponseException):
-        # Unsupported on tables or running against stub – use docs length
-        total_items = len(docs)
+    # Use helper that gracefully degrades on tables
+    from app.utils.db_helpers import safe_count
+
+    total_items = await safe_count(
+        db_table,
+        query_filter=query_filter,
+        fallback_len=len(docs),
+    )
 
     summaries: List[VideoSummary] = [VideoSummary.model_validate(d) for d in docs]
 

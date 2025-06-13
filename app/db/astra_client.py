@@ -61,6 +61,10 @@ except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
             def collection(self, *args, **kwargs):
                 return _StubCollection()
 
+            async def create_collection(self, *args, **kwargs):  # noqa: D401
+                """No-op stub for create_collection used in unit tests."""
+                return {}
+
         AstraDB = _AstraDBStub  # type: ignore
         AstraDBCollection = _StubCollection  # type: ignore
 
@@ -80,6 +84,10 @@ except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
 
             def collection(self, table_name: str):  # type: ignore
                 return self._db.get_collection(table_name)
+
+            async def create_collection(self, name: str, **kwargs):  # noqa: D401
+                """Proxy to the underlying AsyncDatabase.create_collection."""
+                return await self._db.create_collection(name, **kwargs)
 
         AstraDB = _AstraDBV2Wrapper  # type: ignore
         AstraDBCollection = AsyncCollection  # type: ignore
