@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS killrvideo.videos (
     name text,
     preview_image_location text,
     tags set<text>,                              -- Collection for efficient tag storage
-    content_features vector<float, 16>,         -- Vector type from Cassandra 5.0 for ML features
+    content_features vector<float, 4096>,         -- Vector type (4096-dim) for NV-Embed semantic search
     userid uuid,
     content_rating text,                         -- 'G', 'PG', 'PG-13', 'R', etc.
     category text,
