@@ -36,7 +36,9 @@ async def safe_count(
     try:
         return await db_table.count_documents(filter=query_filter, upper_bound=10**9)
     except (TypeError, DataAPIResponseException) as exc:  # pragma: no cover – fallback
-        if isinstance(exc, DataAPIResponseException) and "UNSUPPORTED_TABLE_COMMAND" not in str(exc):
+        if isinstance(
+            exc, DataAPIResponseException
+        ) and "UNSUPPORTED_TABLE_COMMAND" not in str(exc):
             # An unexpected Data API error – surface to caller.
             raise
-        return fallback_len 
+        return fallback_len

@@ -14,7 +14,6 @@ from app.models.video import VideoID, VideoStatusEnum
 from app.services import video_service, user_service
 from app.external_services.sentiment_mock import MockSentimentAnalyzer
 import inspect  # local import to avoid new dependency
-from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
 from app.utils.db_helpers import safe_count
 
 # testing mocks

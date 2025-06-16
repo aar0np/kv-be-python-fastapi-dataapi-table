@@ -53,16 +53,22 @@ def _to_flag_model(doc: dict) -> Flag:
     return Flag(
         flagId=UUID(flag_id) if flag_id else uuid4(),
         userId=UUID(user_id_raw) if user_id_raw else UUID(int=0),
-        contentType=ContentTypeEnum(content_type) if content_type else ContentTypeEnum.VIDEO,
+        contentType=ContentTypeEnum(content_type)
+        if content_type
+        else ContentTypeEnum.VIDEO,
         contentId=UUID(content_id) if content_id else UUID(int=0),
         reasonCode=reason_code or "other",
         reasonText=reason_text,
-        createdAt=norm.get("createdat") or norm.get("review_date") or datetime.now(timezone.utc),
-        updatedAt=norm.get("updatedat") or norm.get("review_date") or datetime.now(timezone.utc),
+        createdAt=norm.get("createdat")
+        or norm.get("review_date")
+        or datetime.now(timezone.utc),
+        updatedAt=norm.get("updatedat")
+        or norm.get("review_date")
+        or datetime.now(timezone.utc),
         status=FlagStatusEnum(norm.get("status", "open")),
-        moderatorId=UUID(norm["moderatorid"]) if norm.get("moderatorid") else (
-            UUID(norm["reviewer"]) if norm.get("reviewer") else None
-        ),
+        moderatorId=UUID(norm["moderatorid"])
+        if norm.get("moderatorid")
+        else (UUID(norm["reviewer"]) if norm.get("reviewer") else None),
         moderatorNotes=norm.get("moderatornotes"),
         resolvedAt=norm.get("resolvedat") or norm.get("review_date"),
     )
@@ -142,7 +148,7 @@ async def create_flag(
     # Attempt to insert the document.  If the **flags** collection has not
     # been created yet Astra will return a ``COLLECTION_NOT_EXIST`` error.
     # Instead of surfacing a 500 to the caller we create the collection on
-    #-the-fly and retry once.  This mirrors the graceful handling already
+    # -the-fly and retry once.  This mirrors the graceful handling already
     # implemented in ``list_flags``.
     # ------------------------------------------------------------------
 
@@ -153,7 +159,9 @@ async def create_flag(
         # in environments (e.g. CI) that rely on the stub client.
         from astrapy.exceptions.data_api_exceptions import DataAPIResponseException  # type: ignore
 
-        if isinstance(exc, DataAPIResponseException) and "COLLECTION_NOT_EXIST" in str(exc):
+        if isinstance(exc, DataAPIResponseException) and "COLLECTION_NOT_EXIST" in str(
+            exc
+        ):
             # Lazily create the collection and retry the insert exactly once.
             db = await get_astra_db()
 
@@ -168,7 +176,9 @@ async def create_flag(
 
             db_table = await get_table(CONTENT_MOD_TABLE_NAME)
             await db_table.insert_one(document=doc)
-        elif isinstance(exc, DataAPIResponseException) and "UNKNOWN_TABLE_COLUMNS" in str(exc):
+        elif isinstance(
+            exc, DataAPIResponseException
+        ) and "UNKNOWN_TABLE_COLUMNS" in str(exc):
             # Strip any keys not in the table schema and retry once.
             allowed_cols = {
                 "contentid",
@@ -346,7 +356,9 @@ async def action_on_flag(
     update_payload_model = {
         "status": new_status,
         "moderatorId": moderator.userId,
-        "resolvedAt": now if new_status in {FlagStatusEnum.APPROVED, FlagStatusEnum.REJECTED} else None,
+        "resolvedAt": now
+        if new_status in {FlagStatusEnum.APPROVED, FlagStatusEnum.REJECTED}
+        else None,
         "updatedAt": now,
         "moderatorNotes": moderator_notes,
     }
