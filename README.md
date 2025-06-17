@@ -47,6 +47,7 @@ Environment variables (all live in `.env`):
 | `ASTRA_DB_APPLICATION_TOKEN` | Token created in Astra UI |
 | `ASTRA_DB_KEYSPACE` | Keyspace name |
 | `SECRET_KEY` | JWT signing secret |
+| `VECTOR_SEARCH_ENABLED` | Toggle semantic vector search (true/false) |
 
 ---
 

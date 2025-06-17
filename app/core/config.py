@@ -104,6 +104,8 @@ class Settings(BaseSettings):
 
     INLINE_METADATA_DISABLED: bool = False
     ENABLE_BACKGROUND_PROCESSING: bool = True
+    # Feature flag – enables semantic vector search endpoints
+    VECTOR_SEARCH_ENABLED: bool = False
 
     # ------------------------------------------------------------------
     # YouTube integration
@@ -130,7 +132,11 @@ class Settings(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def _sanitize_bool_tokens(cls, data):  # type: ignore[return-value]
-        for key in ("INLINE_METADATA_DISABLED", "ENABLE_BACKGROUND_PROCESSING"):
+        for key in (
+            "INLINE_METADATA_DISABLED",
+            "ENABLE_BACKGROUND_PROCESSING",
+            "VECTOR_SEARCH_ENABLED",
+        ):
             if key in data and isinstance(data[key], str):
                 raw = data[key]
                 # Split at first whitespace or '#'
