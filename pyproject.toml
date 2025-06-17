@@ -26,6 +26,7 @@ ruff = "^0.11.12"
 email-validator = "^2.2.0"
 pyyaml = {version = "^6.0", optional = false}
 python-dotenv = "^1.1.0"
+locust = "^2.26.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -40,3 +41,4 @@ lint.extend-ignore = ["E402", "E702"]
 
 [tool.poetry.scripts]
 gen-openapi = "scripts.generate_openapi:main"
+run-load-test = "scripts.run_load_test:main"

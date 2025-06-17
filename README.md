@@ -89,6 +89,36 @@ poetry run pytest -v           # verbose
 poetry run pytest --cov=app    # with coverage (needs pytest-cov)
 ```
 
+### End-to-End Smoke Test (staging)
+Provide the base URL of a running deployment via the `STAGING_BASE_URL` env var and run the *e2e* marked tests:
+
+```bash
+STAGING_BASE_URL=https://staging.killrvideo.com \
+poetry run pytest tests/e2e -m e2e -q
+```
+
+The test performs a single semantic search request and validates the JSON schema.
+
+### On-Demand Load Testing
+A lightweight Locust scenario ships with the repo. Use the `run-load-test` helper (registered as a Poetry script) to drive a burst of semantic searches against any environment:
+
+```bash
+# 200 users, ramping at 20/s for 5 minutes
+poetry run run-load-test https://staging.killrvideo.com \
+  --users 200 --spawn-rate 20 --duration 5m
+```
+
+Flags:
+* `URL` (positional) – base URL to test
+* `--users` – concurrent users (default 200)
+* `--spawn-rate` – users spawned per second (default 20)
+* `--duration` – test length (Locust time string, default `5m`)
+
+Behind the scenes this wraps:
+```bash
+locust -f load/semantic_search.py --headless -u <users> -r <spawn> -t <duration> --host <URL>
+```
+
 ---
 
 ## Project Structure
