@@ -704,25 +704,18 @@ async def search_videos_by_keyword(
     page_size: int,
     db_table: Optional[AstraDBCollection] = None,
 ) -> Tuple[List[VideoSummary], int]:
-    """Basic case-insensitive substring search across title, description, tags."""
+    """Keyword search fallback using Astra's semantic `$vectorize` sort.
 
-    if db_table is None:
-        db_table = await get_table(VIDEOS_TABLE_NAME)
+    The Data API does not support `$regex` filters. Instead we rely on the
+    built-in vector search to rank results by textual similarity to *query*.
+    This mirrors what ``search_videos_by_semantic`` does but keeps the public
+    interface unchanged for callers expecting *keyword* search.
+    """
 
-    escaped = re.escape(query)
-    search_filter: Dict[str, Any] = {
-        "$or": [
-            {"name": {"$regex": escaped, "$options": "i"}},
-            {"description": {"$regex": escaped, "$options": "i"}},
-            {"tags": {"$regex": escaped, "$options": "i"}},
-        ],
-    }
-
-    return await list_videos_with_query(
-        query_filter=search_filter,
+    return await search_videos_by_semantic(
+        query=query,
         page=page,
         page_size=page_size,
-        sort_options={"added_date": -1},
         db_table=db_table,
     )
 
@@ -759,14 +752,25 @@ async def search_videos_by_semantic(
             detail="Query exceeds 512-token limit for semantic search.",
         )
 
-    sort_vector = {"$vectorize": query}
+    # Delegate to reusable helper so we can later swap with server-side
+    # threshold once the Data API supports it natively.
 
-    return await list_videos_with_query(
-        query_filter={},
+    from app.services.vector_search_utils import (
+        semantic_search_with_threshold,
+    )
+
+    if db_table is None:
+        db_table = await get_table(VIDEOS_TABLE_NAME)
+
+    return await semantic_search_with_threshold(
+        db_table=db_table,
+        vector_column="content_features",
+        query=query,
         page=page,
         page_size=page_size,
-        sort_options=sort_vector,
-        db_table=db_table,
+        # NV-Embed scores rarely exceed ~0.75, so 0.65 keeps the top
+        # matches while still trimming weak ones.
+        similarity_threshold=0.65,
     )
 
 

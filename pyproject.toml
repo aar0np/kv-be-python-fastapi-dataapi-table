@@ -15,6 +15,7 @@ python-jose = {extras = ["cryptography"], version = "^3.5.0"}
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 astrapy = "^2.0.1"
 cassandra-driver = "^3.29.2"
+requests = "^2.31.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -42,3 +43,4 @@ lint.extend-ignore = ["E402", "E702"]
 [tool.poetry.scripts]
 gen-openapi = "scripts.generate_openapi:main"
 run-load-test = "scripts.run_load_test:main"
+attach-nvidia-index = "scripts.attach_nvidia_vector_index:main"

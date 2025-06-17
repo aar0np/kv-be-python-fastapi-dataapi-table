@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS killrvideo.videos (
     name text,
     preview_image_location text,
     tags set<text>,                              -- Collection for efficient tag storage
-    content_features vector<float, 4096>,         -- Vector type (4096-dim) for NV-Embed semantic search
+    content_features vector<float, 1024>,         -- Vector type (1024-dim) for NV-Embed semantic search
     userid uuid,
     content_rating text,                         -- 'G', 'PG', 'PG-13', 'R', etc.
     category text,
@@ -135,10 +135,13 @@ USING 'StorageAttachedIndex';
 
 -- Vector search index with COSINE similarity function
 -- Enables ANN searches for content-based recommendations
-CREATE CUSTOM INDEX IF NOT EXISTS videos_content_features_idx 
-ON killrvideo.videos(content_features) 
+CREATE CUSTOM INDEX videos_content_features_idx
+ON killrvideo.videos(content_features)
 USING 'StorageAttachedIndex'
-WITH OPTIONS = { 'similarity_function': 'COSINE' };
+WITH OPTIONS = {
+  'similarity_function' : 'COSINE',
+  'source_model'        : 'nv-qa-4'
+};
 
 -- Denormalized table for latest videos
 -- Supports queries: Get latest videos in chronological order
