@@ -1,0 +1,36 @@
+{
+  "commands": [
+    {
+      "alterTable": {
+        "name": "videos",
+        "alterColumns": {
+          "content_features": {
+            "type": "vector",
+            "dimension": 4096,
+            "service": {
+              "provider": "nvidia",
+              "modelName": "NV-Embed-QA"
+            }
+          }
+        }
+      }
+    },
+    {
+      "dropIndex": {
+        "name": "videos_content_features_idx",
+        "table": "videos"
+      }
+    },
+    {
+      "createIndex": {
+        "name": "videos_content_features_idx",
+        "table": "videos",
+        "column": "content_features",
+        "type": "vector",
+        "options": {
+          "similarity_function": "COSINE"
+        }
+      }
+    }
+  ]
+} 

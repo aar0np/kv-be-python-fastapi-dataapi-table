@@ -37,6 +37,7 @@ from app.external_services.youtube_metadata import (
     MetadataFetchError,
 )
 from app.core.config import settings
+from app.utils.text import clip_to_512_tokens
 
 from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
 
@@ -194,6 +195,24 @@ async def submit_new_video(
     )
 
     full_doc = new_video.model_dump(by_alias=False, exclude_none=True)
+
+    # ------------------------------------------------------------------
+    # Build semantic embedding input string for NV-Embed auto-vectorisation.
+    # The Data API embeds *strings* via the `$vectorize` operator when they are
+    # stored in a ``vector`` column.  We therefore concatenate title,
+    # description, and tags into a single text blob and store it directly in
+    # the ``content_features`` field.  The vector will be generated
+    # server-side during the insert/update operation.
+    # ------------------------------------------------------------------
+
+    components: list[str] = [resolved_name]
+    if new_video.description:
+        components.append(new_video.description)
+    if new_video.tags:
+        components.append(" ".join(new_video.tags))
+
+    embedding_raw = "\n".join(components)
+    full_doc["content_features"] = clip_to_512_tokens(embedding_raw)
 
     # Ensure any HttpUrl instances are converted to plain strings so AstraDB
     # JSON encoder does not choke.  We purposely *do not* strip unknown
@@ -704,6 +723,49 @@ async def search_videos_by_keyword(
         page=page,
         page_size=page_size,
         sort_options={"added_date": -1},
+        db_table=db_table,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Semantic (vector) search
+# ---------------------------------------------------------------------------
+
+
+async def search_videos_by_semantic(
+    query: str,
+    page: int,
+    page_size: int,
+    db_table: Optional[AstraDBCollection] = None,
+) -> Tuple[List[VideoSummary], int]:
+    """Return videos ranked by semantic similarity using Astra `$vectorize`.
+
+    Raises
+    ------
+    HTTPException
+        With status ``400`` if the query exceeds the NV-Embed 512-token limit.
+    """
+
+    # ------------------------------------------------------------------
+    # Validate token length against NVIDIA provider limit (512 tokens).
+    # ------------------------------------------------------------------
+
+    import re as _re
+
+    token_re = _re.compile(r"\w+|[^\w\s]", flags=_re.UNICODE)
+    if len(token_re.findall(query)) > 512:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Query exceeds 512-token limit for semantic search.",
+        )
+
+    sort_vector = {"$vectorize": query}
+
+    return await list_videos_with_query(
+        query_filter={},
+        page=page,
+        page_size=page_size,
+        sort_options=sort_vector,
         db_table=db_table,
     )
 

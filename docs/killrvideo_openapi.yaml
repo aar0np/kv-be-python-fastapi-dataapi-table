@@ -620,6 +620,18 @@ paths:
           description: Search query term
           title: Query
         description: Search query term
+      - name: mode
+        in: query
+        required: false
+        schema:
+          enum:
+          - semantic
+          - keyword
+          type: string
+          description: 'Search mode: semantic or keyword'
+          default: keyword
+          title: Mode
+        description: 'Search mode: semantic or keyword'
       - name: page
         in: query
         required: false
