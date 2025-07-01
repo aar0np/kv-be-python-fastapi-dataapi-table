@@ -136,6 +136,10 @@ class Settings(BaseSettings):
             "INLINE_METADATA_DISABLED",
             "ENABLE_BACKGROUND_PROCESSING",
             "VECTOR_SEARCH_ENABLED",
+            "OBSERVABILITY_ENABLED",
+            "OTEL_TRACES_ENABLED",
+            "OTEL_METRICS_ENABLED",
+            "LOKI_ENABLED",
         ):
             if key in data and isinstance(data[key], str):
                 raw = data[key]
@@ -143,6 +147,51 @@ class Settings(BaseSettings):
                 token = raw.split("#", 1)[0].strip().split()[0]
                 data[key] = token
         return data
+
+    # ------------------------------------------------------------------
+    # Observability / Telemetry
+    # ------------------------------------------------------------------
+
+    # Master on/off switch – when false no observability instrumentation is
+    # initialised.  This is useful for local development or extremely
+    # resource-constrained environments where you don't want the overhead of
+    # telemetry.
+    OBSERVABILITY_ENABLED: bool = Field(default=True, description="Globally enable/disable all extra observability (metrics/traces/log shipping).")
+
+    # --- OpenTelemetry ---------------------------------------------------
+
+    # OTLP endpoint that traces / metrics will be sent to.  For the Docker
+    # Compose stack provided by the `mcp-observability` project this will be
+    # the OpenTelemetry Collector service – typically http://otelcol:4317.
+    OTEL_EXPORTER_OTLP_ENDPOINT: str | None = Field(
+        default=None,
+        description="Base OTLP gRPC endpoint, e.g. http://otelcol:4317.  If unset OTLP export is disabled.",
+    )
+
+    # Toggle exporting OpenTelemetry traces.  Requires OTEL_EXPORTER_OTLP_ENDPOINT.
+    OTEL_TRACES_ENABLED: bool = True
+
+    # Toggle exporting OpenTelemetry metrics via OTLP.  The Prometheus scrape
+    # endpoint (provided by prometheus-fastapi-instrumentator) remains active
+    # regardless of this flag so that a local Prometheus instance can still
+    # pull metrics if desired.
+    OTEL_METRICS_ENABLED: bool = False
+
+    # Sample ratio (0.0-1.0) for traces – 1.0 = always.
+    OTEL_TRACES_SAMPLER_RATIO: float = Field(default=1.0, ge=0.0, le=1.0)
+
+    # --- Centralised logging (Loki) --------------------------------------
+
+    LOKI_ENABLED: bool = Field(default=False, description="Enable structured log shipping to Loki.")
+    LOKI_ENDPOINT: str | None = Field(
+        default=None,
+        description="Loki push API endpoint, e.g. http://loki:3100/loki/api/v1/push.",
+    )
+
+    # Extra labels to attach to Loki log streams – provided as a comma-separated
+    # list of key=value pairs so they can be conveniently set via environment
+    # variables.
+    LOKI_EXTRA_LABELS: str | None = Field(default=None)
 
 
 settings = Settings()

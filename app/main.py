@@ -30,6 +30,13 @@ from app.api.v1.endpoints import (
     moderation,
 )
 
+# --------------------------------------------------------------
+# Observability must be configured as early as possible so that
+# instrumentation picks up all subsequent application events.
+# --------------------------------------------------------------
+
+from app.utils.observability import configure_observability  # noqa: E402
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="KillrVideo v2 - Monolith Backend", version=settings.APP_VERSION)
@@ -62,6 +69,14 @@ api_router_v1.include_router(flags.router)
 api_router_v1.include_router(moderation.router)
 
 app.include_router(api_router_v1)
+
+# ---------------------------------------------------------------------------
+# Initialise observability (metrics / tracing / log shipping) if enabled.
+# This must run *after* the FastAPI instance is created so that instrumentors
+# can attach middleware and routes.
+# ---------------------------------------------------------------------------
+
+configure_observability(app)
 
 # Attempt to import httpx & httpcore connection error classes for fine-grained
 # exception handling.  They may not be present in some lightweight test
