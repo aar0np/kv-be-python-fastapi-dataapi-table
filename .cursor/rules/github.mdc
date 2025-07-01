@@ -1,0 +1,45 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## 1. Create‑Before‑Code
+
+* **MUST** create a GitHub Issue for every non‑trivial task (≥ 10 lines of code or config).
+* Use `gh issue create --title "<concise action>" --body "<goal / acceptance criteria>" --label "ai-task"`.
+* Include context‑link back to the originating prompt or reference.
+
+## 2. Granular Task Sizing
+
+* Break large work into issues estimated ≤ 4 hours of agent effort.
+* Cross‑link parent/child issues via `gh issue comment <id> "Tracks #<child>"`.
+
+## 3. Progress Logging
+
+* On **start** of work: `gh issue comment <id> "⏳"`.
+* After each meaningful commit: `git commit -m "<feat|fix>: <summary> (refs #<id>)"` then push.
+* Use `gh issue comment` to post logs or blockers. Prefix with emojis:
+
+  * `🚧` Work in progress
+  * `❗` Need input
+  * `✅` Completed sub‑task
+
+## 5. Closing the Loop
+
+* When work is complete: `gh issue close <id> --comment "✅ Done."`
+* CI must reference closed issues for auditability.
+
+## 7. Fallback / Errors
+
+* If `gh` command fails, log the full stderr in the issue comment `❗ gh error`. Retry twice max.
+* If GitHub API outage detected, pause work and comment `⚠️ GitHub outage – pausing`.
+
+## 8. Security & Secrets
+
+* Never include credentials, tokens, or personal data in issues or comments.
+* Redact log output before posting.
+
+## 9. Style Reminders
+
+* Follow repo coding conventions 
+* Each PR **must** pass lint + unit tests before closing the issue.
