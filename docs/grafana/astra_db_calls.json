@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 36,
+  "title": "KillrVideo – Astra DB Operations",
+  "uid": "kv-astra-db",
+  "timezone": "browser",
+  "tags": ["killrvideo", "database"],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Astra DB Query p95 by Operation",
+      "id": 1,
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(astra_db_query_duration_seconds_bucket[5m])) by (le, operation))",
+          "legendFormat": "{{operation}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Astra DB Query Rate (ops/s)",
+      "id": 2,
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "targets": [
+        {
+          "expr": "sum(rate(astra_db_query_duration_seconds_count[1m])) by (operation)",
+          "legendFormat": "{{operation}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Astra DB Query Average Duration",
+      "id": 3,
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [
+        {
+          "expr": "rate(astra_db_query_duration_seconds_sum[5m]) / rate(astra_db_query_duration_seconds_count[5m])",
+          "legendFormat": "avg (all ops)",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "time": {"from": "now-30m", "to": "now"},
+  "refresh": "10s",
+  "editable": true
+} 
