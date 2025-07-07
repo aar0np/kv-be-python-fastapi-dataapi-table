@@ -54,18 +54,29 @@ async def semantic_search_with_threshold(
         for typical thresholds around 0.7-0.9.
     """
 
+    from opentelemetry import trace
+    import time
+    from app.metrics import VECTOR_SEARCH_DURATION_SECONDS
+
+    tracer = trace.get_tracer(__name__)
+
     if page < 1 or page_size < 1:
         return [], 0
 
     # Ask Astra for a generous slice so we can trim client-side.
     overfetch = page_size * overfetch_factor * page  # grow with page number
 
-    cursor = db_table.find(
-        filter={},
-        sort={vector_column: query},
-        limit=overfetch,
-        include_similarity=True,  # ⭐
-    )
+    start_time = time.perf_counter()
+
+    with tracer.start_as_current_span("vector.search") as span:
+        span.set_attribute("query", query[:64])  # truncate long queries for span
+
+        cursor = db_table.find(
+            filter={},
+            sort={vector_column: query},
+            limit=overfetch,
+            include_similarity=True,  # ⭐
+        )
 
     # Fetch docs.
     docs: List[Dict[str, Any]]
@@ -85,13 +96,22 @@ async def semantic_search_with_threshold(
         pre_trim = len(docs)
         docs = [d for d in docs if d.get("$similarity", 0) >= similarity_threshold]
         logger.debug(
-            "Trimmed by threshold %.2f: %s → %s docs", similarity_threshold, pre_trim, len(docs)
+            "Trimmed by threshold %.2f: %s → %s docs",
+            similarity_threshold,
+            pre_trim,
+            len(docs),
         )
 
-    if docs:
-        logger.debug(
-            "Top doc similarity after trim: %.3f", docs[0].get("$similarity", -1.0)
-        )
+        if docs:
+            logger.debug(
+                "Top doc similarity after trim: %.3f", docs[0].get("$similarity", -1.0)
+            )
+
+        # Record metrics
+        duration = time.perf_counter() - start_time
+        VECTOR_SEARCH_DURATION_SECONDS.observe(duration)
+        span.set_attribute("duration_ms", int(duration * 1000))
+        span.set_attribute("total_results", len(docs))
 
     total = len(docs)
 
@@ -102,4 +122,4 @@ async def semantic_search_with_threshold(
 
     summaries = [VideoSummary.model_validate(d) for d in page_docs]
 
-    return summaries, total 
+    return summaries, total

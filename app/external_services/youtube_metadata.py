@@ -63,62 +63,102 @@ async def _fetch_v3_api(
 ) -> YouTubeMetadata:
     """Fetch metadata using the official YouTube Data API v3."""
 
-    url = (
-        "https://www.googleapis.com/youtube/v3/videos?part=snippet"
-        f"&id={youtube_id}&key={api_key}"
-    )
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        resp = await client.get(url)
-        if resp.status_code != 200:
-            raise MetadataFetchError(
-                f"Data API returned HTTP {resp.status_code}: {resp.text[:200]}"
-            )
-        data = resp.json()
-        items = data.get("items") or []
-        if not items:
-            raise MetadataFetchError(
-                "Video not found or no snippet returned from Data API"
+    # ------------------------------------------------------------------
+    # Observability – manual span & histogram timing
+    # ------------------------------------------------------------------
+
+    from opentelemetry import trace
+    import time
+    from app.metrics import YOUTUBE_FETCH_DURATION_SECONDS
+
+    tracer = trace.get_tracer(__name__)
+
+    start_time = time.perf_counter()
+
+    with tracer.start_as_current_span("youtube.fetch_v3_api") as span:
+        span.set_attribute("youtube.video_id", youtube_id)
+
+        url = (
+            "https://www.googleapis.com/youtube/v3/videos?part=snippet"
+            f"&id={youtube_id}&key={api_key}"
+        )
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                raise MetadataFetchError(
+                    f"Data API returned HTTP {resp.status_code}: {resp.text[:200]}"
+                )
+            data = resp.json()
+            items = data.get("items") or []
+            if not items:
+                raise MetadataFetchError(
+                    "Video not found or no snippet returned from Data API"
+                )
+
+            snippet = items[0].get("snippet") or {}
+            result = YouTubeMetadata(
+                title=snippet.get("title", ""),
+                description=snippet.get("description"),
+                thumbnail_url=snippet.get("thumbnails"),  # handled by validator
+                tags=snippet.get("tags", []),
             )
 
-        snippet = items[0].get("snippet") or {}
-        return YouTubeMetadata(
-            title=snippet.get("title", ""),
-            description=snippet.get("description"),
-            thumbnail_url=snippet.get("thumbnails"),  # handled by validator
-            tags=snippet.get("tags", []),
-        )
+            # Record duration & size metrics
+            duration = time.perf_counter() - start_time
+            YOUTUBE_FETCH_DURATION_SECONDS.labels(method="v3_api").observe(duration)
+            span.set_attribute("duration_ms", int(duration * 1000))
+            span.set_attribute("title_length", len(result.title))
+
+            return result
 
 
 async def _fetch_oembed(youtube_id: str, timeout: float) -> YouTubeMetadata:
     """Fetch metadata using YouTube's public oEmbed endpoint."""
 
-    url = (
-        "https://www.youtube.com/oembed?format=json&url="
-        f"https://youtu.be/{youtube_id}"
-    )
-    print(f"DEBUG _fetch_oembed: url={url}")
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        resp = await client.get(url)
-        if resp.status_code != 200:
-            raise MetadataFetchError(
-                f"oEmbed returned HTTP {resp.status_code}: {resp.text[:200]}"
-            )
-        print(f"DEBUG _fetch_oembed: resp={resp.text}")
-        data = resp.json()
-        title = data.get("title")
-        if not title:
-            raise MetadataFetchError("oEmbed response missing title field")
-        thumb = (
-            data.get("thumbnail_url")
-            or f"https://i.ytimg.com/vi/{youtube_id}/hqdefault.jpg"
-        )
+    from opentelemetry import trace
+    import time
+    from app.metrics import YOUTUBE_FETCH_DURATION_SECONDS
 
-        return YouTubeMetadata(
-            title=title,
-            description=None,  # oEmbed does not provide description
-            thumbnail_url=thumb,
-            tags=[],
+    tracer = trace.get_tracer(__name__)
+
+    start_time = time.perf_counter()
+
+    with tracer.start_as_current_span("youtube.fetch_oembed") as span:
+        span.set_attribute("youtube.video_id", youtube_id)
+
+        url = (
+            "https://www.youtube.com/oembed?format=json&url="
+            f"https://youtu.be/{youtube_id}"
         )
+        print(f"DEBUG _fetch_oembed: url={url}")
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                raise MetadataFetchError(
+                    f"oEmbed returned HTTP {resp.status_code}: {resp.text[:200]}"
+                )
+            print(f"DEBUG _fetch_oembed: resp={resp.text}")
+            data = resp.json()
+            title = data.get("title")
+            if not title:
+                raise MetadataFetchError("oEmbed response missing title field")
+            thumb = (
+                data.get("thumbnail_url")
+                or f"https://i.ytimg.com/vi/{youtube_id}/hqdefault.jpg"
+            )
+
+            result = YouTubeMetadata(
+                title=title,
+                description=None,  # oEmbed does not provide description
+                thumbnail_url=thumb,
+                tags=[],
+            )
+
+            duration = time.perf_counter() - start_time
+            YOUTUBE_FETCH_DURATION_SECONDS.labels(method="oembed").observe(duration)
+            span.set_attribute("duration_ms", int(duration * 1000))
+
+            return result
 
 
 # ---------------------------------------------------------------------------

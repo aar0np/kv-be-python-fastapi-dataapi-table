@@ -24,36 +24,51 @@ async def get_related_videos(
     and assign each a random relevance score.
     """
 
-    # Ensure the referenced video exists – if it does not, we treat the request
-    # as valid but return an empty list. The caller is free to 404 at the API
-    # layer if it wishes to enforce existence – keeping this generic allows the
-    # service to be reused from different contexts.
-    target_video = await video_service.get_video_by_id(video_id)
-    if target_video is None:
-        return []
+    from opentelemetry import trace
+    import time
+    from app.metrics import RECOMMENDATION_DURATION_SECONDS
 
-    latest_summaries, _total = await video_service.list_latest_videos(
-        page=1, page_size=limit + 5
-    )
+    tracer = trace.get_tracer(__name__)
+    start_time = time.perf_counter()
 
-    related_items: List[RecommendationItem] = []
+    with tracer.start_as_current_span("recommend.related_videos") as span:
+        span.set_attribute("video_id", str(video_id))
 
-    for summary in latest_summaries:
-        if summary.videoId == video_id:
-            # Skip the source video itself
-            continue
-        if len(related_items) >= limit:
-            break
-        related_items.append(
-            RecommendationItem(
-                videoId=summary.videoId,
-                title=summary.title,
-                thumbnailUrl=summary.thumbnailUrl,
-                score=round(random.uniform(0.5, 1.0), 2),
-            )
+        # Ensure the referenced video exists – if it does not, we treat the request
+        # as valid but return an empty list. The caller is free to 404 at the API
+        # layer if it wishes to enforce existence – keeping this generic allows the
+        # service to be reused from different contexts.
+        target_video = await video_service.get_video_by_id(video_id)
+        if target_video is None:
+            return []
+
+        latest_summaries, _total = await video_service.list_latest_videos(
+            page=1, page_size=limit + 5
         )
 
-    return related_items
+        related_items: List[RecommendationItem] = []
+
+        for summary in latest_summaries:
+            if summary.videoId == video_id:
+                # Skip the source video itself
+                continue
+            if len(related_items) >= limit:
+                break
+            related_items.append(
+                RecommendationItem(
+                    videoId=summary.videoId,
+                    title=summary.title,
+                    thumbnailUrl=summary.thumbnailUrl,
+                    score=round(random.uniform(0.5, 1.0), 2),
+                )
+            )
+
+        duration = time.perf_counter() - start_time
+        RECOMMENDATION_DURATION_SECONDS.observe(duration)
+        span.set_attribute("duration_ms", int(duration * 1000))
+        span.set_attribute("result_count", len(related_items))
+
+        return related_items
 
 
 async def get_personalized_for_you_videos(
@@ -68,15 +83,31 @@ async def get_personalized_for_you_videos(
     recommender can be dropped-in later without further API changes.
     """
 
-    # For visibility during development/testing.
-    print(
-        f"STUB: Generating 'For You' feed for user {current_user.userId} (page={page}, page_size={page_size})"
-    )
+    from opentelemetry import trace
+    import time
+    from app.metrics import RECOMMENDATION_DURATION_SECONDS
 
-    videos, total_items = await video_service.list_latest_videos(
-        page=page, page_size=page_size
-    )
-    return videos, total_items
+    tracer = trace.get_tracer(__name__)
+    start_time = time.perf_counter()
+
+    with tracer.start_as_current_span("recommend.for_you") as span:
+        span.set_attribute("user_id", str(current_user.userId))
+
+        # For visibility during development/testing.
+        print(
+            f"STUB: Generating 'For You' feed for user {current_user.userId} (page={page}, page_size={page_size})"
+        )
+
+        videos, total_items = await video_service.list_latest_videos(
+            page=page, page_size=page_size
+        )
+
+        duration = time.perf_counter() - start_time
+        RECOMMENDATION_DURATION_SECONDS.observe(duration)
+        span.set_attribute("duration_ms", int(duration * 1000))
+        span.set_attribute("result_count", total_items)
+
+        return videos, total_items
 
 
 # ---------------------------------------------------------------------------

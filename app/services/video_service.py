@@ -44,6 +44,10 @@ from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
 # AsyncMock / MagicMock for tests – imported early so helper can reference them
 from unittest.mock import AsyncMock, MagicMock
 
+from opentelemetry import trace
+import time
+from app.metrics import ASTRA_DB_QUERY_DURATION_SECONDS
+
 # ---------------------------------------------------------------------------
 # Constants & Regex Patterns
 # ---------------------------------------------------------------------------
@@ -441,6 +445,12 @@ async def list_videos_with_query(
 ) -> Tuple[List[VideoSummary], int]:
     """Generic helper to run a paginated query and map to summaries."""
 
+    from opentelemetry import trace
+    import time
+    from app.metrics import ASTRA_DB_QUERY_DURATION_SECONDS
+
+    tracer = trace.get_tracer(__name__)
+
     if db_table is None:
         db_table = await get_table(source_table_name)
 
@@ -462,24 +472,37 @@ async def list_videos_with_query(
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         query_filter = {"day": today}
 
-    cursor = db_table.find(
-        filter=query_filter, skip=skip, limit=page_size, sort=sort_options
-    )
+    start_time = time.perf_counter()
 
-    docs: List[Dict[str, Any]] = []
-    if hasattr(cursor, "to_list"):
-        docs = await cursor.to_list()
-    else:  # Stub collection path
-        docs = cursor  # type: ignore[assignment]
+    with tracer.start_as_current_span("astra.list_videos") as span:
+        span.set_attribute("source_table", source_table_name)
+        span.set_attribute("page", page)
+        span.set_attribute("page_size", page_size)
 
-    # Use helper that gracefully degrades on tables
-    from app.utils.db_helpers import safe_count
+        cursor = db_table.find(
+            filter=query_filter, skip=skip, limit=page_size, sort=sort_options
+        )
 
-    total_items = await safe_count(
-        db_table,
-        query_filter=query_filter,
-        fallback_len=len(docs),
-    )
+        docs: List[Dict[str, Any]] = []
+        if hasattr(cursor, "to_list"):
+            docs = await cursor.to_list()
+        else:  # Stub collection path
+            docs = cursor  # type: ignore[assignment]
+
+        # Use helper that gracefully degrades on tables
+        from app.utils.db_helpers import safe_count
+
+        total_items = await safe_count(
+            db_table,
+            query_filter=query_filter,
+            fallback_len=len(docs),
+        )
+
+        # Metrics
+        duration = time.perf_counter() - start_time
+        ASTRA_DB_QUERY_DURATION_SECONDS.labels(operation="find").observe(duration)
+        span.set_attribute("duration_ms", int(duration * 1000))
+        span.set_attribute("result_count", total_items)
 
     summaries: List[VideoSummary] = [VideoSummary.model_validate(d) for d in docs]
 

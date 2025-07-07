@@ -27,10 +27,37 @@ def test_metrics_route_present_once(module_path: str, attr: str):
     app: FastAPI = getattr(mod, attr)
 
     if Instrumentator is None:  # pragma: no cover
-        pytest.skip("prometheus_fastapi_instrumentator not installed; skipping metrics route test")
+        pytest.skip(
+            "prometheus_fastapi_instrumentator not installed; skipping metrics route test"
+        )
 
     metrics_routes = [r for r in app.routes if getattr(r, "path", None) == "/metrics"]
 
-    assert len(metrics_routes) == 1, (
-        f"Expected exactly one /metrics route in {module_path}, found {len(metrics_routes)}"
-    ) 
+    assert (
+        len(metrics_routes) == 1
+    ), f"Expected exactly one /metrics route in {module_path}, found {len(metrics_routes)}"
+
+    # ------------------------------------------------------------------
+    # Ensure custom histograms are registered and exposed even before any
+    # requests have been observed.  We hit the endpoint and look for the
+    # HELP/TYPE metadata lines which are always present.
+    # ------------------------------------------------------------------
+
+    from starlette.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    body = resp.text
+
+    expected_metric_names = [
+        "astra_db_query_duration_seconds",
+        "youtube_fetch_duration_seconds",
+        "vector_search_duration_seconds",
+        "recommendation_generation_duration_seconds",
+    ]
+
+    for m in expected_metric_names:
+        assert (
+            f"# TYPE {m} histogram" in body or f"{m}_bucket" in body
+        ), f"Custom metric {m} not found in /metrics output for {module_path}"
