@@ -156,7 +156,10 @@ class Settings(BaseSettings):
     # initialised.  This is useful for local development or extremely
     # resource-constrained environments where you don't want the overhead of
     # telemetry.
-    OBSERVABILITY_ENABLED: bool = Field(default=True, description="Globally enable/disable all extra observability (metrics/traces/log shipping).")
+    OBSERVABILITY_ENABLED: bool = Field(
+        default=True,
+        description="Globally enable/disable all extra observability (metrics/traces/log shipping).",
+    )
 
     # --- OpenTelemetry ---------------------------------------------------
 
@@ -177,12 +180,21 @@ class Settings(BaseSettings):
     # pull metrics if desired.
     OTEL_METRICS_ENABLED: bool = False
 
+    # Protocol for OTLP export – "grpc" (default) or "http". Allows integration with collectors that only expose the HTTP/JSON OTLP endpoint (4318).
+    OTEL_EXPORTER_OTLP_PROTOCOL: str = Field(default="grpc")
+
+    # Optional additional headers to send along OTLP requests (for auth tokens, etc.).
+    # Provide as comma-separated key=value list, e.g. "mcp-token=abcd123,env=dev".
+    OTEL_EXPORTER_OTLP_HEADERS: str | None = Field(default=None)
+
     # Sample ratio (0.0-1.0) for traces – 1.0 = always.
     OTEL_TRACES_SAMPLER_RATIO: float = Field(default=1.0, ge=0.0, le=1.0)
 
     # --- Centralised logging (Loki) --------------------------------------
 
-    LOKI_ENABLED: bool = Field(default=False, description="Enable structured log shipping to Loki.")
+    LOKI_ENABLED: bool = Field(
+        default=False, description="Enable structured log shipping to Loki."
+    )
     LOKI_ENDPOINT: str | None = Field(
         default=None,
         description="Loki push API endpoint, e.g. http://loki:3100/loki/api/v1/push.",

@@ -50,4 +50,4 @@ async def test_semantic_search_smoke():  # noqa: D401 – simple smoke test
 
     # Ensure we actually received *some* results in staging (sanity guard).
     assert isinstance(payload["data"], list)
-    # We don't enforce a minimum count (could be empty) but the type must hold. 
+    # We don't enforce a minimum count (could be empty) but the type must hold.

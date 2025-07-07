@@ -1,0 +1,23 @@
+name: Grafana JSON lint
+
+on:
+  push:
+    paths:
+      - 'docs/grafana/*.json'
+  pull_request:
+    paths:
+      - 'docs/grafana/*.json'
+
+jobs:
+  json-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+          for file in docs/grafana/*.json; do
+            echo "Linting $file";
+            jq type "$file" > /dev/null;
+          done 
