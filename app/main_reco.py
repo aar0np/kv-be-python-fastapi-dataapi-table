@@ -12,6 +12,7 @@ from app.api.v1.endpoints.recommendations_feed import (
     router as recommendations_feed_router,
 )
 from app.api.v1.endpoints.reco_internal import router as reco_internal_router
+from app.utils.observability import configure_observability
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,9 @@ service_app.add_middleware(
 
 service_app.include_router(recommendations_feed_router, prefix=settings.API_V1_STR)
 service_app.include_router(reco_internal_router, prefix=settings.API_V1_STR)
+
+# Initialise observability
+configure_observability(service_app)
 
 
 @service_app.on_event("startup")

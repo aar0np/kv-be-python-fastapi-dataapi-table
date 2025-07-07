@@ -11,6 +11,7 @@ from app.models.common import ProblemDetail
 from app.api.v1.endpoints.account_management import (
     router as account_management_router,
 )
+from app.utils.observability import configure_observability
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,9 @@ service_app.add_middleware(
 
 # Include router(s)
 service_app.include_router(account_management_router, prefix=settings.API_V1_STR)
+
+# Initialise observability (metrics, traces, logs) if enabled
+configure_observability(service_app)
 
 
 @service_app.on_event("startup")

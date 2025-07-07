@@ -10,6 +10,7 @@ from app.db.astra_client import init_astra_db
 from app.models.common import ProblemDetail
 from app.api.v1.endpoints.video_catalog import router as video_catalog_router
 from app.api.v1.endpoints.flags import router as flags_router
+from app.utils.observability import configure_observability
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,9 @@ service_app.add_middleware(
 
 service_app.include_router(video_catalog_router, prefix=settings.API_V1_STR)
 service_app.include_router(flags_router, prefix=settings.API_V1_STR)
+
+# Initialise observability
+configure_observability(service_app)
 
 
 @service_app.on_event("startup")
