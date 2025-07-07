@@ -32,8 +32,11 @@ This repo demonstrates modern API best-practices with:
 git clone https://github.com/your-org/killrvideo-python-fastapi-backend.git
 cd killrvideo-python-fastapi-backend
 
-# install deps (creates .venv)
+# install runtime dependencies (prod / Docker)
 poetry install
+
+# for local development with tests & tooling uncomment:
+# poetry install --with dev
 
 # copy env template & fill in Astra creds and SECRET_KEY
 cp .env.example .env
@@ -70,6 +73,43 @@ Run one:
 ```bash
 poetry run uvicorn app.main_video:service_app --reload --port 8002
 ```
+
+---
+
+## Local HTTPS Development
+
+Front-end development expects HTTPS at `https://localhost:8443`. Follow these steps to generate a trusted certificate and run FastAPI over TLS locally.
+
+```bash
+# 1. Install mkcert (one-time)
+brew install mkcert             # macOS
+# Linux:
+#   sudo apt install libnss3-tools && \
+#   curl -L https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64 -o /usr/local/bin/mkcert && \
+#   chmod +x /usr/local/bin/mkcert
+
+# 2. Generate & trust a local CA (one-time)
+mkcert -install
+
+# 3. Create cert/key for localhost and loopback addresses
+mkdir -p certs
+mkcert -key-file certs/localhost-key.pem \
+       -cert-file certs/localhost.pem \
+       localhost 127.0.0.1 ::1
+```
+
+Start the backend on `https://localhost:8443`:
+
+```bash
+poetry run uvicorn app.main:app \
+  --reload --host 0.0.0.0 --port 8443 \
+  --ssl-certfile certs/localhost.pem \
+  --ssl-keyfile  certs/localhost-key.pem
+```
+
+Your React/Next.js dev server can now proxy or fetch against `https://localhost:8443` without the *ECONNREFUSED* error.
+
+_Tip_: For convenience create `scripts/run_dev_https.py` and a Poetry entry-point so you can simply run `poetry run serve-https`. See the script in the repo for details.
 
 ---
 
@@ -177,3 +217,14 @@ You can also run it ad-hoc without Poetry's script shim:
 ```bash
 poetry run python scripts/generate_openapi.py
 ``` 
+
+## Observability
+See docs/observability.md for full guide.  Import-ready Grafana dashboards:
+
+| Dashboard | File | UID |
+|-----------|------|-----|
+| API latency by route | `docs/grafana/api_latency_by_route.json` | `kv-api-latency` |
+| Backend hot-path latency | `docs/grafana/backend_hot_path.json` | `kv-hotpath` |
+| Astra DB operations | `docs/grafana/astra_db_calls.json` | `kv-astra-db` |
+
+Upload the JSON → select Prometheus datasource → done. 
