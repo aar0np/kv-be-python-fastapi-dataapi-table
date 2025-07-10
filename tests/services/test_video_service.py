@@ -276,9 +276,10 @@ async def test_list_latest_videos():
         mock_list_with_query.assert_called_once_with(
             {},
             1,
-            10,
+            3,
+            sort_options={"added_date": -1},
             db_table=mock_db,
-            source_table_name=video_service.LATEST_VIDEOS_TABLE_NAME,
+            source_table_name=video_service.VIDEOS_TABLE_NAME,
         )
         assert summaries == []
         assert total == 0

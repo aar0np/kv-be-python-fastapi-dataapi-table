@@ -155,9 +155,7 @@ async def _problem_response(request: Request, status_code: int, detail: str):
 if HttpxConnectError is not None:
 
     @app.exception_handler(HttpxConnectError)  # type: ignore[arg-type]
-    async def httpx_connect_error_handler(
-        request: Request, exc: Exception
-    ):  # noqa: D401
+    async def httpx_connect_error_handler(request: Request, exc: Exception):  # noqa: D401
         logger.warning("AstraDB connectivity problem: %s", exc)
         # Provide more context for troubleshooting: log the failed request (if
         # available) and the full stack trace at DEBUG level.
@@ -176,9 +174,7 @@ if HttpxConnectError is not None:
 if HttpcoreConnectError is not None:
 
     @app.exception_handler(HttpcoreConnectError)  # type: ignore[arg-type]
-    async def httpcore_connect_error_handler(
-        request: Request, exc: Exception
-    ):  # noqa: D401
+    async def httpcore_connect_error_handler(request: Request, exc: Exception):  # noqa: D401
         logger.warning("AstraDB connectivity problem: %s", exc)
         # httpcore.ConnectError does not expose the original request object, but we
         # still output the stack trace to aid debugging.

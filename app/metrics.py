@@ -25,4 +25,4 @@ VECTOR_SEARCH_DURATION_SECONDS = Histogram(
 RECOMMENDATION_DURATION_SECONDS = Histogram(
     "recommendation_generation_duration_seconds",
     "Latency of recommendation engine stub (seconds)",
-) 
+)

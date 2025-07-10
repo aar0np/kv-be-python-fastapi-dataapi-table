@@ -34,9 +34,23 @@ def main() -> None:  # noqa: D401 – entry point
     )
     # Backwards-compat optional flag (not shown in usage)
     parser.add_argument("--host", dest="_host_legacy", help=argparse.SUPPRESS)
-    parser.add_argument("--users", type=int, default=DEFAULT_USERS, help="Number of concurrent users (default: 200)")
-    parser.add_argument("--spawn-rate", type=int, default=DEFAULT_SPAWN_RATE, help="User hatch rate per second (default: 20)")
-    parser.add_argument("--duration", default=DEFAULT_DURATION, help="Test duration (Locust time format, default: 5m)")
+    parser.add_argument(
+        "--users",
+        type=int,
+        default=DEFAULT_USERS,
+        help="Number of concurrent users (default: 200)",
+    )
+    parser.add_argument(
+        "--spawn-rate",
+        type=int,
+        default=DEFAULT_SPAWN_RATE,
+        help="User hatch rate per second (default: 20)",
+    )
+    parser.add_argument(
+        "--duration",
+        default=DEFAULT_DURATION,
+        help="Test duration (Locust time format, default: 5m)",
+    )
     parser.add_argument(
         "--locust-file",
         default=str(Path("load/semantic_search.py")),
@@ -68,4 +82,4 @@ def main() -> None:  # noqa: D401 – entry point
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main() 
+    main()

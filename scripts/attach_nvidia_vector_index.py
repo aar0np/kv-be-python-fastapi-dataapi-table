@@ -33,7 +33,6 @@ The script is idempotent: if the index already exists with the correct
 options it exits silently.
 """
 
-import json
 import os
 import sys
 import logging
@@ -81,6 +80,7 @@ HEADERS = {
 # Helper functions
 # --------------------------------------------------------------------------------------
 
+
 def _post(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Send a JSON payload and return JSON response (or error)."""
     resp = requests.post(DATA_API_URL, headers=HEADERS, json=payload, timeout=10)
@@ -97,24 +97,28 @@ def _post(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def main() -> None:  # noqa: D401
-    log.info("Enabling vectorize on '%s.%s' via NVIDIA model '%s' …", TABLE, COLUMN, MODEL_ID)
-    _post({
-        "alterTable": {
-            "operation": {
-                "addVectorize": {
-                    "columns": {
-                        COLUMN: {
-                            "provider": "nvidia",
-                            "modelName": MODEL_ID,
+    log.info(
+        "Enabling vectorize on '%s.%s' via NVIDIA model '%s' …", TABLE, COLUMN, MODEL_ID
+    )
+    _post(
+        {
+            "alterTable": {
+                "operation": {
+                    "addVectorize": {
+                        "columns": {
+                            COLUMN: {
+                                "provider": "nvidia",
+                                "modelName": MODEL_ID,
+                            }
                         }
                     }
                 }
             }
         }
-    })
+    )
 
     log.info("✅ content_features column now configured for $vectorize via NVIDIA.")
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main() 
+    main()

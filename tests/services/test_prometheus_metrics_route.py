@@ -33,9 +33,9 @@ def test_metrics_route_present_once(module_path: str, attr: str):
 
     metrics_routes = [r for r in app.routes if getattr(r, "path", None) == "/metrics"]
 
-    assert (
-        len(metrics_routes) == 1
-    ), f"Expected exactly one /metrics route in {module_path}, found {len(metrics_routes)}"
+    assert len(metrics_routes) == 1, (
+        f"Expected exactly one /metrics route in {module_path}, found {len(metrics_routes)}"
+    )
 
     # ------------------------------------------------------------------
     # Ensure custom histograms are registered and exposed even before any
@@ -58,6 +58,6 @@ def test_metrics_route_present_once(module_path: str, attr: str):
     ]
 
     for m in expected_metric_names:
-        assert (
-            f"# TYPE {m} histogram" in body or f"{m}_bucket" in body
-        ), f"Custom metric {m} not found in /metrics output for {module_path}"
+        assert f"# TYPE {m} histogram" in body or f"{m}_bucket" in body, (
+            f"Custom metric {m} not found in /metrics output for {module_path}"
+        )

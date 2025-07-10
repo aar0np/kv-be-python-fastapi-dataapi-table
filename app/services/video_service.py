@@ -44,9 +44,6 @@ from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
 # AsyncMock / MagicMock for tests – imported early so helper can reference them
 from unittest.mock import AsyncMock, MagicMock
 
-from opentelemetry import trace
-import time
-from app.metrics import ASTRA_DB_QUERY_DURATION_SECONDS
 
 # ---------------------------------------------------------------------------
 # Constants & Regex Patterns
@@ -514,12 +511,18 @@ async def list_latest_videos(
     page_size: int,
     db_table: Optional[AstraDBCollection] = None,
 ) -> Tuple[List[VideoSummary], int]:
+    """Return the newest *three* videos across all days for the home page row."""
+
+    # We only need a single row of 3 videos on the UI – cap the page size.
+    effective_size = min(page_size, 3)
+
     return await list_videos_with_query(
         {},
         page,
-        page_size,
+        effective_size,
+        sort_options={"added_date": -1},
         db_table=db_table,
-        source_table_name=LATEST_VIDEOS_TABLE_NAME,
+        source_table_name=VIDEOS_TABLE_NAME,
     )
 
 
@@ -982,9 +985,7 @@ async def fetch_video_title(youtube_url: str) -> str:  # noqa: D401
 # ---------------------------------------------------------------------------
 
 
-async def process_video_submission(
-    video_id: VideoID, youtube_video_id: str
-) -> None:  # noqa: D401,E501
+async def process_video_submission(video_id: VideoID, youtube_video_id: str) -> None:  # noqa: D401,E501
     """Background processing stub that updates status transitions.
 
     In production most metadata is now fetched inline, but this helper can

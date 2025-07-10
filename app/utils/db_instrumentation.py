@@ -6,6 +6,7 @@ surrounded by an OpenTelemetry span and Prometheus histogram sample.  This
 provides visibility into **all** Data-API mutations without having to wrap
 each individual call site.
 """
+
 from __future__ import annotations
 
 import time
@@ -62,4 +63,4 @@ def instrument_astra_collection() -> None:  # noqa: D401
         AstraDBCollection.update_one = _update_wrap  # type: ignore[attr-defined]
 
     # Mark as patched
-    AstraDBCollection._kv_instrumented = True  # type: ignore[attr-defined] 
+    AstraDBCollection._kv_instrumented = True  # type: ignore[attr-defined]

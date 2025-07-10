@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 from typing import Any
 
@@ -70,7 +69,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover
 _LOKI_READY = False
 if settings.LOKI_ENABLED and settings.LOKI_ENDPOINT:
     try:
-        import logging_loki  # type: ignore
+        import logging_loki  # type: ignore  # noqa: F401
 
         _LOKI_READY = True
     except ModuleNotFoundError:  # pragma: no cover
@@ -282,7 +281,7 @@ def _setup_loki_logging() -> None:
 
     try:
         if _LOKI_READY:
-            import logging_loki  # type: ignore
+            import logging_loki  # type: ignore  # noqa: F401
 
             tags = {
                 "service": settings.PROJECT_NAME,

@@ -25,4 +25,4 @@ class SemanticSearchUser(HttpUser):  # noqa: D401 – Locust user class
         # Static query keeps the test deterministic; real test could randomise.
         self.client.get(
             "/api/v1/search/videos", params={"query": "cats", "mode": "semantic"}
-        ) 
+        )

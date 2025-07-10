@@ -98,4 +98,4 @@ def main() -> None:  # noqa: D401 – entry point
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main() 
+    main()

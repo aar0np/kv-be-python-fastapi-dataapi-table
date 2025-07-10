@@ -1,6 +1,3 @@
-import importlib
-from types import ModuleType
-
 import pytest
 from fastapi import FastAPI
 
