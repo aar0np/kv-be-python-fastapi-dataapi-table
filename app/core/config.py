@@ -111,7 +111,7 @@ class Settings(BaseSettings):
     # YouTube integration
     # ------------------------------------------------------------------
 
-    YOUTUBE_API_KEY: str | None = Field(
+    YOUTUBE_API_KEY: str = Field(
         default=None,
         description="API key for YouTube Data API v3. If unset, service falls back to oEmbed.",
     )
