@@ -16,6 +16,8 @@ jobs:
     - name: Install dependencies
       run: poetry install --no-interaction --no-root
     - name: Run tests
+      env: 
+        YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
       run: poetry run pytest
     - name: Run linting
       run: |
