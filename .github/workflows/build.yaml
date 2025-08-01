@@ -1,0 +1,25 @@
+name: Build KillrVideo Python FastAPI backend
+on:
+  push:
+    branches: [ "main" ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9.6'
+    - name: Install Poetry
+      run: pip install poetry
+    - name: Install dependencies
+      run: poetry install --no-interaction --no-root
+    - name: Run tests
+      run: poetry run pytest
+    - name: Run linting
+      run: |
+        poetry run ruff check .
+        poetry run ruff format .
+    - name: Run type checks
+      run: poetry run mypy .
