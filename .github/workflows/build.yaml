@@ -13,6 +13,16 @@ jobs:
         python-version: '3.10'
     - name: Install Poetry
       run: pip install poetry
+    - name: Install pydantic
+      run: pip install pydantic
+    - name: Install google-api-python-client
+      run: pip install google-api-python-client
+    - name: Install grpcio-tools
+      run: pip install grpcio-tools
+    - name: Install grpc-tools
+      run: pip install grpc-tools
+    - name: Install astrapy
+      run: pip install astrapy
     - name: Install dependencies
       run: poetry install --no-interaction --no-root
     - name: Run tests
