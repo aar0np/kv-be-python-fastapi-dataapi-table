@@ -19,8 +19,6 @@ jobs:
       run: pip install google-api-python-client
     - name: Install grpcio-tools
       run: pip install grpcio-tools
-    - name: Install grpc-tools
-      run: pip install grpc-tools
     - name: Install astrapy
       run: pip install astrapy
     - name: Install dependencies
