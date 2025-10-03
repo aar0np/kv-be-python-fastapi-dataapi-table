@@ -77,7 +77,7 @@ class Video(VideoBase):
     videoid: VideoID = Field(default_factory=uuid4, alias="videoId")
     userid: UUID = Field(..., alias="userId")
     added_date: datetime = Field(..., alias="submittedAt")
-    preview_image_location: Optional[HttpUrl] = Field(None, alias="thumbnailUrl")
+    preview_image_location: Optional[str] = Field(None, alias="thumbnailUrl")
 
     # Fields from schema
     location: str
@@ -132,7 +132,7 @@ class VideoSummary(BaseModel):
 
     videoid: VideoID = Field(..., alias="videoId")
     name: str = Field(..., alias="title")
-    preview_image_location: Optional[HttpUrl] = Field(None, alias="thumbnailUrl")
+    preview_image_location: Optional[str] = Field(None, alias="thumbnailUrl")
     userid: UUID = Field(..., alias="userId")
     added_date: datetime = Field(..., alias="submittedAt")
 
