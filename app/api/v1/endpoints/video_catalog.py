@@ -360,7 +360,7 @@ async def get_related_videos_for_video(
     video_id_path: VideoID,
     limit: Annotated[
         int, Query(ge=1, le=20, description="Max number of related videos")
-    ] = 5,
+    ] = 10,
 ):
     """Return a list of videos related to the given video.
 
