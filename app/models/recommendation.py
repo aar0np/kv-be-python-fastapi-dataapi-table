@@ -12,7 +12,7 @@ class RecommendationItem(BaseModel):
 
     videoId: VideoID
     title: str
-    thumbnailUrl: Optional[HttpUrl] = None
+    thumbnailUrl: Optional[str] = None
     # Optional relevance score between 0 and 1 returned if the backend is able
     # to compute it. For the current stub implementation this field will be
     # populated with a random value to help front-end developers integrate.

@@ -86,6 +86,7 @@ class Video(VideoBase):
     content_rating: Optional[str] = None
     category: Optional[str] = None
     language: Optional[str] = None
+    video_vector: Optional[List[float]] = None
 
     # Fields not in schema, but in original model
     youtubeVideoId: Optional[str] = None

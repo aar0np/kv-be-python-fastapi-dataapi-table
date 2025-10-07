@@ -16,13 +16,7 @@ from app.models.user import User
 async def get_related_videos(
     video_id: VideoID, limit: int = 10
 ) -> List[RecommendationItem]:
-    """Return a stubbed *related videos* list.
-
-    In a future iteration this will call into a real recommendation engine that
-    analyses the content of the referenced video to find similar items. For the
-    moment we simply return the latest videos (excluding the reference video)
-    and assign each a random relevance score.
-    """
+    """Return a stubbed *related videos* list."""
 
     from opentelemetry import trace
     import time
@@ -42,23 +36,38 @@ async def get_related_videos(
         if target_video is None:
             return []
 
-        latest_summaries, _total = await video_service.list_latest_videos(
-            page=1, page_size=limit + 5
+        # Placeholder until vector search is working
+        #latest_summaries, _total = await video_service.list_latest_videos(
+        #    page=1, page_size=limit + 5
+        #)
+
+        # Aaron
+        #   query_filter: Dict[str, Any],
+        #   page: int,
+        #   page_size: int,
+        #   sort_options: Optional[Dict[str, Any]] = None,
+        #   db_table: Optional[AstraDBCollection] = None,
+        #   source_table_name: str = VIDEOS_TABLE_NAME,
+        recommended_videos, _total = await video_service.list_videos_with_query(
+            {},
+            page=1,
+            page_size=limit,
+            sort_options={"video_vector": target_video.video_vector}
         )
 
         related_items: List[RecommendationItem] = []
 
-        for summary in latest_summaries:
-            if summary.videoId == video_id:
+        for recVideo in recommended_videos:
+            if recVideo.videoid == video_id:
                 # Skip the source video itself
                 continue
             if len(related_items) >= limit:
                 break
             related_items.append(
                 RecommendationItem(
-                    videoId=summary.videoId,
-                    title=summary.title,
-                    thumbnailUrl=summary.thumbnailUrl,
+                    videoId=recVideo.videoId,
+                    title=recVideo.title,
+                    thumbnailUrl=recVideo.thumbnailUrl,
                     score=round(random.uniform(0.5, 1.0), 2),
                 )
             )
