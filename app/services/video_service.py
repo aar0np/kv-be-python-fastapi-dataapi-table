@@ -88,6 +88,9 @@ logger.info(
     logging.getLogger().getEffectiveLevel(),
 )
 
+# Flag to track if we've logged the view tracking limitation warning
+_logged_views_disabled = False
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -384,6 +387,10 @@ async def record_video_view(
 ) -> None:
     """Increment the view counter stored directly in the *videos* table.
 
+    NOTE: View tracking is currently disabled. The 'views' column exists in the
+    CQL schema but is not yet exposed via the Astra DB Table API. This function
+    will gracefully no-op until API support is added.
+
     The dedicated ``video_playback_stats`` counter table is no longer updated –
     we instead mutate the new ``views`` bigint column in the primary table so
     the entire workflow remains Data-API-only.
@@ -400,11 +407,33 @@ async def record_video_view(
             upsert=True,
         )
     except DataAPIResponseException as exc:
+        global _logged_views_disabled
+        error_str = str(exc)
+
+        # Check if this is the known Table API limitation where the 'views' column
+        # exists in CQL schema but isn't exposed via the Table API yet
+        if (
+            "UNKNOWN_TABLE_COLUMNS" in error_str
+            or "UNSUPPORTED_UPDATE_OPERATIONS" in error_str
+        ):
+            # Log warning once per process lifecycle to avoid log spam
+            if not _logged_views_disabled:
+                logger.warning(
+                    "View tracking is currently disabled. The 'views' column exists in "
+                    "the CQL schema (docs/schema-astra.cql:95) but is not yet exposed "
+                    "via the Astra DB Table API. Views will not be tracked until API "
+                    "support is added. Error codes: UNKNOWN_TABLE_COLUMNS / "
+                    "UNSUPPORTED_UPDATE_OPERATIONS_FOR_TABLE"
+                )
+                _logged_views_disabled = True
+            return  # Gracefully no-op without breaking the API contract
+
         # Some deployments (Astra *tables*) currently reject $inc on bigint –
         # fall back to a manual read-modify-write cycle.
-        if "Update operation not supported" in str(
-            exc
-        ) or "unsupported operations" in str(exc):
+        if (
+            "Update operation not supported" in error_str
+            or "unsupported operations" in error_str
+        ):
             current = (
                 await db_table.find_one(
                     filter={"videoid": _uuid_for_db(video_id, db_table)}
