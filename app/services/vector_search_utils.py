@@ -29,7 +29,7 @@ async def semantic_search_with_threshold(
     *,
     db_table: AstraDBCollection,
     vector_column: str,
-    query: str,
+    query_vector: List[float],
     page: int,
     page_size: int,
     similarity_threshold: float = 0.0,
@@ -43,8 +43,8 @@ async def semantic_search_with_threshold(
         Table / collection to query (must contain the *vector_column*).
     vector_column : str
         Name of the vector column to sort on, e.g. ``"content_features"``.
-    query : str
-        The natural-language query that will be embedded on-the-fly by Astra.
+    query_vector : List[float]
+        Pre-computed embedding vector for the query (384 dimensions for Granite model).
     page / page_size : int
         Standard pagination parameters expected by the public API.
     similarity_threshold : float, optional
@@ -69,11 +69,11 @@ async def semantic_search_with_threshold(
     start_time = time.perf_counter()
 
     with tracer.start_as_current_span("vector.search") as span:
-        span.set_attribute("query", query[:64])  # truncate long queries for span
+        span.set_attribute("vector_dimensions", len(query_vector))
 
         cursor = db_table.find(
             filter={},
-            sort={vector_column: query},
+            sort={vector_column: query_vector},
             limit=overfetch,
             include_similarity=True,  # ⭐
         )

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-"""Bulk‐backfill existing ``videos`` rows with NV-Embed vectors.
+"""Bulk‐backfill existing ``videos`` rows with IBM Granite embeddings.
 
 This helper script scans for documents where ``content_features`` is **null**
-(or missing) and updates them in batches using the Data API ``$vectorize``
-operator.
+(or missing) and updates them in batches by generating embeddings client-side
+using the Granite-Embedding-30m-English model.
 
 Usage (module mode):
     python -m scripts.backfill_vectors [--dry-run] [--page-size N]
@@ -23,7 +23,7 @@ import httpx
 
 from app.core.config import settings
 from app.db.astra_client import get_table
-from app.utils.text import clip_to_512_tokens
+from app.services.embedding_service import get_embedding_service
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -39,14 +39,12 @@ PAGE_SIZE_DEFAULT = 100
 @dataclass
 class UpdateOp:  # noqa: D401 – simple container
     videoid: str
-    vectorize_text: str
+    embedding_vector: List[float]
 
     def to_dict(self) -> Dict[str, Any]:  # noqa: D401
         return {
             "filter": {"videoid": self.videoid},
-            "update": {
-                "$set": {"content_features": {"$vectorize": self.vectorize_text}}
-            },
+            "update": {"$set": {"content_features": self.embedding_vector}},
         }
 
 
@@ -84,7 +82,12 @@ async def _fetch_batch(
     return docs
 
 
-def _build_vectorize_text(doc: Dict[str, Any]) -> str:
+def _build_embedding_vector(doc: Dict[str, Any]) -> List[float]:
+    """Generate a 384-dimensional embedding vector for a video document.
+
+    Combines title, description, and tags into text, then generates
+    embedding using the Granite model.
+    """
     components: List[str] = []
     # Title / name
     if title := doc.get("name"):
@@ -97,8 +100,11 @@ def _build_vectorize_text(doc: Dict[str, Any]) -> str:
         # Join by space for embedding – order is irrelevant
         components.append(" ".join(tags))
 
-    raw = "\n".join(components)
-    return clip_to_512_tokens(raw)
+    text = "\n".join(components)
+
+    # Generate embedding using Granite model (handles token limiting internally)
+    embedding_service = get_embedding_service()
+    return embedding_service.generate_embedding(text)
 
 
 async def backfill_vectors(
@@ -123,8 +129,8 @@ async def backfill_vectors(
         for doc in batch:
             if not (vid := doc.get("videoid")):
                 continue  # Safety guard for malformed rows
-            text = _build_vectorize_text(doc)
-            ops.append(UpdateOp(videoid=str(vid), vectorize_text=text))
+            embedding = _build_embedding_vector(doc)
+            ops.append(UpdateOp(videoid=str(vid), embedding_vector=embedding))
 
         if ops:
             if dry_run:

@@ -6,11 +6,7 @@
         "alterColumns": {
           "content_features": {
             "type": "vector",
-            "dimension": 4096,
-            "service": {
-              "provider": "nvidia",
-              "modelName": "NV-Embed-QA"
-            }
+            "dimension": 384
           }
         }
       }

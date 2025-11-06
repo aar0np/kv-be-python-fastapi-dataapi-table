@@ -37,7 +37,7 @@ from app.external_services.youtube_metadata import (
     MetadataFetchError,
 )
 from app.core.config import settings
-from app.utils.text import clip_to_512_tokens
+from app.services.embedding_service import get_embedding_service
 
 from astrapy.exceptions.data_api_exceptions import DataAPIResponseException
 
@@ -198,12 +198,11 @@ async def submit_new_video(
     full_doc = new_video.model_dump(by_alias=False, exclude_none=True)
 
     # ------------------------------------------------------------------
-    # Build semantic embedding input string for NV-Embed auto-vectorisation.
-    # The Data API embeds *strings* via the `$vectorize` operator when they are
-    # stored in a ``vector`` column.  We therefore concatenate title,
-    # description, and tags into a single text blob and store it directly in
-    # the ``content_features`` field.  The vector will be generated
-    # server-side during the insert/update operation.
+    # Generate semantic embeddings using IBM Granite model.
+    # We concatenate title, description, and tags into a single text blob,
+    # then generate a 384-dimensional embedding vector client-side using
+    # the Granite-Embedding-30m-English model. The embedding service
+    # handles token limiting (512 tokens max) automatically.
     # ------------------------------------------------------------------
 
     components: list[str] = [resolved_name]
@@ -212,8 +211,11 @@ async def submit_new_video(
     if new_video.tags:
         components.append(" ".join(new_video.tags))
 
-    embedding_raw = "\n".join(components)
-    full_doc["content_features"] = clip_to_512_tokens(embedding_raw)
+    embedding_text = "\n".join(components)
+
+    # Generate embedding using Granite model (returns List[float] with 384 dimensions)
+    embedding_service = get_embedding_service()
+    full_doc["content_features"] = embedding_service.generate_embedding(embedding_text)
 
     # Ensure any HttpUrl instances are converted to plain strings so AstraDB
     # JSON encoder does not choke.  We purposely *do not* strip unknown
@@ -757,29 +759,33 @@ async def search_videos_by_semantic(
     page_size: int,
     db_table: Optional[AstraDBCollection] = None,
 ) -> Tuple[List[VideoSummary], int]:
-    """Return videos ranked by semantic similarity using Astra `$vectorize`.
+    """Return videos ranked by semantic similarity using IBM Granite embeddings.
+
+    The query is embedded client-side using the Granite-Embedding-30m-English
+    model, then compared against stored video embeddings using cosine similarity.
 
     Raises
     ------
     HTTPException
-        With status ``400`` if the query exceeds the NV-Embed 512-token limit.
+        With status ``400`` if the query exceeds the 512-token limit.
     """
 
     # ------------------------------------------------------------------
-    # Validate token length against NVIDIA provider limit (512 tokens).
+    # Generate query embedding using Granite model.
+    # The embedding service handles token validation (512 tokens max).
     # ------------------------------------------------------------------
 
-    import re as _re
+    embedding_service = get_embedding_service()
 
-    token_re = _re.compile(r"\w+|[^\w\s]", flags=_re.UNICODE)
-    if len(token_re.findall(query)) > 512:
+    try:
+        query_vector = embedding_service.generate_embedding(query)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Query exceeds 512-token limit for semantic search.",
+            detail=f"Failed to generate query embedding: {str(e)}",
         )
 
-    # Delegate to reusable helper so we can later swap with server-side
-    # threshold once the Data API supports it natively.
+    # Delegate to reusable helper with pre-computed embedding vector.
 
     from app.services.vector_search_utils import (
         semantic_search_with_threshold,
@@ -791,12 +797,12 @@ async def search_videos_by_semantic(
     return await semantic_search_with_threshold(
         db_table=db_table,
         vector_column="content_features",
-        query=query,
+        query_vector=query_vector,
         page=page,
         page_size=page_size,
-        # NV-Embed scores rarely exceed ~0.75, so 0.65 keeps the top
-        # matches while still trimming weak ones.
-        similarity_threshold=0.65,
+        # Use configurable similarity threshold from settings
+        # Can be adjusted via VECTOR_SEARCH_SIMILARITY_THRESHOLD in .env
+        similarity_threshold=settings.VECTOR_SEARCH_SIMILARITY_THRESHOLD,
     )
 
 

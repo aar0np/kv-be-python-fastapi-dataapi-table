@@ -104,8 +104,19 @@ class Settings(BaseSettings):
 
     INLINE_METADATA_DISABLED: bool = False
     ENABLE_BACKGROUND_PROCESSING: bool = True
-    # Feature flag – enables semantic vector search endpoints
-    VECTOR_SEARCH_ENABLED: bool = False
+    # Feature flag – enables semantic vector search using IBM Granite embeddings
+    VECTOR_SEARCH_ENABLED: bool = True
+
+    # Minimum similarity score (0.0-1.0) for semantic search results
+    # Higher values = more strict matching (fewer but more relevant results)
+    # Lower values = more lenient matching (more results but potentially less relevant)
+    # Recommended range: 0.5-0.8 for Granite embeddings
+    VECTOR_SEARCH_SIMILARITY_THRESHOLD: float = Field(
+        default=0.65,
+        ge=0.0,
+        le=1.0,
+        description="Minimum cosine similarity score for search results (0.0-1.0)",
+    )
 
     # ------------------------------------------------------------------
     # YouTube integration
