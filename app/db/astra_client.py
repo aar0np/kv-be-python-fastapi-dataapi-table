@@ -85,6 +85,10 @@ except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
             def collection(self, table_name: str):  # type: ignore
                 return self._db.get_collection(table_name)
 
+            def get_table(self, table_name: str):  # type: ignore
+                """Get a table (for working with CQL tables via Data API)."""
+                return self._db.get_table(table_name)
+
             async def create_collection(self, name: str, **kwargs):  # noqa: D401
                 """Proxy to the underlying AsyncDatabase.create_collection."""
                 return await self._db.create_collection(name, **kwargs)
