@@ -71,7 +71,7 @@ async def semantic_search_with_threshold(
     with tracer.start_as_current_span("vector.search") as span:
         span.set_attribute("query", query[:64])  # truncate long queries for span
 
-        cursor = db_table.find(
+        cursor = await db_table.find(
             filter={},
             sort={vector_column: query},
             limit=overfetch,

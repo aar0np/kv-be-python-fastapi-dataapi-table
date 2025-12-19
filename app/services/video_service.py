@@ -476,7 +476,7 @@ async def list_videos_with_query(
         span.set_attribute("page", page)
         span.set_attribute("page_size", page_size)
 
-        cursor = db_table.find(
+        cursor = await db_table.find(
             filter=query_filter, skip=skip, limit=page_size, sort=sort_options
         )
 
@@ -484,7 +484,8 @@ async def list_videos_with_query(
         if hasattr(cursor, "to_list"):
             docs = await cursor.to_list()
         else:  # Stub collection path
-            docs = cursor  # type: ignore[assignment]
+            #docs = cursor  # type: ignore[assignment]
+            docs = []
 
         # Use helper that gracefully degrades on tables
         from app.utils.db_helpers import safe_count
@@ -816,7 +817,7 @@ async def suggest_tags(
         db_table = await get_table(VIDEOS_TABLE_NAME)
 
     # Fetch tags field from a subset of recent videos
-    cursor = db_table.find(
+    cursor = await db_table.find(
         filter={
             "tags": {"$exists": True},
         },

@@ -13,9 +13,8 @@ def mock_env_vars(monkeypatch):
     config.settings = config.Settings()
     yield
     # Clean up by re-importing original settings or resetting
-    config.settings = config.Settings(
-        _env_file=None
-    )  # Attempt to load without .env to get defaults
+    config.settings = config.Settings()  # Attempt to load without .env to get defaults
+    #print(config.Settings.en)
 
 
 def test_settings_load_from_env():
@@ -42,7 +41,6 @@ def test_settings_default_value():
 
     # Re-instantiate settings to pick up the default, not from env or a .env file
     # This assumes Settings can be instantiated in a way that ignores .env for testing purposes.
-    # A common way is to pass _env_file=None or a path to a non-existent .env file.
-    settings_with_defaults = Settings(_env_file=None)  # Pydantic-settings feature
+    settings_with_defaults = Settings()  # Pydantic-settings feature
 
     assert settings_with_defaults.API_V1_STR == "/api/v1"

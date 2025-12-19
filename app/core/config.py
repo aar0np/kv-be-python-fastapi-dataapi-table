@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.version import __version__ as app_version
 from pydantic import Field
 from pydantic import model_validator
+from typing import Union
 
 # --------------------------------------------------------------
 # Root logging configuration
@@ -166,7 +167,7 @@ class Settings(BaseSettings):
     # OTLP endpoint that traces / metrics will be sent to.  For the Docker
     # Compose stack provided by the `mcp-observability` project this will be
     # the OpenTelemetry Collector service – typically http://otelcol:4317.
-    OTEL_EXPORTER_OTLP_ENDPOINT: str | None = Field(
+    OTEL_EXPORTER_OTLP_ENDPOINT: Union[str, None] = Field(
         default=None,
         description="Base OTLP gRPC endpoint, e.g. http://otelcol:4317.  If unset OTLP export is disabled.",
     )
@@ -185,7 +186,7 @@ class Settings(BaseSettings):
 
     # Optional additional headers to send along OTLP requests (for auth tokens, etc.).
     # Provide as comma-separated key=value list, e.g. "mcp-token=abcd123,env=dev".
-    OTEL_EXPORTER_OTLP_HEADERS: str | None = Field(default=None)
+    OTEL_EXPORTER_OTLP_HEADERS: Union[str, None] = Field(default=None)
 
     # Sample ratio (0.0-1.0) for traces – 1.0 = always.
     OTEL_TRACES_SAMPLER_RATIO: float = Field(default=1.0, ge=0.0, le=1.0)
@@ -195,7 +196,7 @@ class Settings(BaseSettings):
     LOKI_ENABLED: bool = Field(
         default=False, description="Enable structured log shipping to Loki."
     )
-    LOKI_ENDPOINT: str | None = Field(
+    LOKI_ENDPOINT: Union[str, None] = Field(
         default=None,
         description="Loki push API endpoint, e.g. http://loki:3100/loki/api/v1/push.",
     )
@@ -203,7 +204,7 @@ class Settings(BaseSettings):
     # Extra labels to attach to Loki log streams – provided as a comma-separated
     # list of key=value pairs so they can be conveniently set via environment
     # variables.
-    LOKI_EXTRA_LABELS: str | None = Field(default=None)
+    LOKI_EXTRA_LABELS: Union[str, None] = Field(default=None)
 
 
 settings = Settings()

@@ -11,6 +11,9 @@ if "astrapy" not in sys.modules:  # pragma: no cover
     db_stub = types.ModuleType("astrapy.db")
 
     class _StubCollection:  # noqa: D401
+        async def find(self, *args, **kwargs):
+            return None
+
         async def find_one(self, *args, **kwargs):  # noqa: D401
             return None
 
@@ -19,6 +22,9 @@ if "astrapy" not in sys.modules:  # pragma: no cover
 
         async def update_one(self, *args, **kwargs):  # noqa: D401
             return {}
+        
+        async def count_documents(self, *args, **kwargs):  # noqa: D401
+            return 0
 
     class _StubDB:  # noqa: D401
         def __init__(self, *args, **kwargs):

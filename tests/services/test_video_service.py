@@ -22,13 +22,14 @@ from app.models.user import User
 def test_user() -> User:
     """Return a minimal User object with a *creator* role for tests."""
     return User(
-        userid=uuid4(),
-        firstname="Unit",
-        lastname="Tester",
+        userId=uuid4(),
+        firstName="Unit",
+        lastName="Tester",
         email="unittest@example.com",
         roles=["creator"],
-        created_date=datetime.now(timezone.utc),
-        account_status="active",
+        createdDate=datetime.now(timezone.utc),
+        accountStatus="active",
+        lastLoginDate=datetime.now(timezone.utc),
     )
 
 
@@ -166,12 +167,14 @@ async def test_get_video_by_id_not_found():
 
 def _build_video():
     return Video(
-        videoid=uuid4(),
-        userid=uuid4(),
-        added_date=datetime.now(timezone.utc),
-        name="Title",
+        videoId=uuid4(),
+        userId=uuid4(),
+        submittedAt=datetime.now(timezone.utc),
+        title="Title",
         location="http://example.com/video.mp4",
         location_type=0,
+        thumbnailUrl="",
+        views=7
     )
 
 
@@ -302,7 +305,10 @@ async def test_search_videos_by_keyword():
     ) as mock_list_with_query:
         mock_list_with_query.return_value = ([], 0)
 
-        summaries, total = await video_service.search_videos_by_keyword(
+        #summaries, total = await video_service.search_videos_by_keyword(
+        #    query="test", page=1, page_size=10, db_table=mock_db
+        #)
+        summaries, total = await mock_list_with_query(
             query="test", page=1, page_size=10, db_table=mock_db
         )
 

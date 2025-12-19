@@ -33,6 +33,7 @@ except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
         DataAPIClient = None  # type: ignore
 
         class _StubCollection:  # noqa: D401
+
             async def find_one(self, *args, **kwargs):
                 return None
 
@@ -43,7 +44,7 @@ except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
                 return {}
 
             # Added methods to better emulate async collection behaviour in CI
-            def find(self, *args, **kwargs):  # type: ignore[override]
+            async def find(self, *args, **kwargs):  # type: ignore[override]
                 """Return an empty list as a pseudo-cursor."""
                 return []
 
