@@ -52,7 +52,7 @@ async def get_related_videos(
             {},
             page=1,
             page_size=limit,
-            sort_options={"video_vector": target_video.video_vector}
+            sort_options={"content_features": target_video.content_features}
         )
 
         related_items: List[RecommendationItem] = []

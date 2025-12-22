@@ -42,7 +42,7 @@ class VideoBase(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     name: str = Field(..., min_length=3, max_length=100, alias="title")
-    description: Optional[str] = Field(default=None, max_length=1000)
+    description: Optional[str] = Field(default=None, max_length=2000)
     tags: List[str] = Field(default_factory=list)
 
 
@@ -86,7 +86,6 @@ class Video(VideoBase):
     content_rating: Optional[str] = None
     category: Optional[str] = None
     language: Optional[str] = None
-    video_vector: Optional[List[float]] = None
 
     # Fields not in schema, but in original model
     youtubeVideoId: Optional[str] = None

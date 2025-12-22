@@ -476,7 +476,7 @@ async def list_videos_with_query(
         span.set_attribute("page", page)
         span.set_attribute("page_size", page_size)
 
-        cursor = await db_table.find(
+        cursor = db_table.find(
             filter=query_filter, skip=skip, limit=page_size, sort=sort_options
         )
 
@@ -817,7 +817,7 @@ async def suggest_tags(
         db_table = await get_table(VIDEOS_TABLE_NAME)
 
     # Fetch tags field from a subset of recent videos
-    cursor = await db_table.find(
+    cursor = db_table.find(
         filter={
             "tags": {"$exists": True},
         },
