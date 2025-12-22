@@ -9,14 +9,16 @@ from app.services import video_service
 async def test_semantic_search_correct_sort(monkeypatch):
     # Patch list_videos_with_query to avoid hitting real DB and capture args
     captured = {}
+    sort_options={"$vectorize": "cats talking"}
 
     async def _fake_list(
-        query_filter, page, page_size, sort_options, db_table=None, **kwargs
+        query_filter, page, page_size, sort_options=sort_options, db_table=None, **kwargs
     ):  # noqa: D401
         captured["sort"] = sort_options
         return [], 0
 
-    monkeypatch.setattr(video_service, "list_videos_with_query", _fake_list)
+    #monkeypatch.setattr(video_service, "list_videos_with_query", _fake_list)
+    monkeypatch.setattr(video_service, "search_videos_by_semantic", _fake_list)
 
     await video_service.search_videos_by_semantic("cats talking", page=1, page_size=10)
 

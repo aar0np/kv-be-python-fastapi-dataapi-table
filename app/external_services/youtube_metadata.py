@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 import httpx
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 # Internal config
 from app.core.config import settings
@@ -42,7 +42,8 @@ class YouTubeMetadata(BaseModel):
     }
 
     # Accept either camelCase or snake_case in JSON responses
-    @validator("thumbnail_url", pre=True)
+    #@field_validator("thumbnail_url", pre=True)
+    @field_validator('thumbnail_url', mode='before')
     def _cast_thumbnail(cls, value):  # noqa: D401,N805
         if isinstance(value, dict):
             # Data API returns thumbnails dict – choose *maxres* or *high*
@@ -99,7 +100,7 @@ async def _fetch_v3_api(
             result = YouTubeMetadata(
                 title=snippet.get("title", ""),
                 description=snippet.get("description"),
-                thumbnail_url=snippet.get("thumbnails"),  # handled by validator
+                thumbnailUrl=snippet.get("thumbnails"),  # handled by validator
                 tags=snippet.get("tags", []),
             )
 
@@ -150,7 +151,7 @@ async def _fetch_oembed(youtube_id: str, timeout: float) -> YouTubeMetadata:
             result = YouTubeMetadata(
                 title=title,
                 description=None,  # oEmbed does not provide description
-                thumbnail_url=thumb,
+                thumbnailUrl=thumb,
                 tags=[],
             )
 

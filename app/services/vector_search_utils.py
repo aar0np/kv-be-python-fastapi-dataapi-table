@@ -85,21 +85,26 @@ async def semantic_search_with_threshold(
     else:
         docs = cursor  # type: ignore[assignment]
 
+    try:
+        numDocs = len(docs)
+    except Exception:
+        numDocs = 0
+
     logger.debug(
         "Vector search fetched %s docs (page=%s, overfetch=%s)",
-        len(docs),
+        numDocs,
         page,
         overfetch,
     )
 
-    if similarity_threshold > 0:
-        pre_trim = len(docs)
+    if similarity_threshold > 0 and docs is not None:
+        pre_trim = numDocs
         docs = [d for d in docs if d.get("$similarity", 0) >= similarity_threshold]
         logger.debug(
             "Trimmed by threshold %.2f: %s → %s docs",
             similarity_threshold,
             pre_trim,
-            len(docs),
+            numDocs,
         )
 
         if docs:
@@ -111,14 +116,18 @@ async def semantic_search_with_threshold(
         duration = time.perf_counter() - start_time
         VECTOR_SEARCH_DURATION_SECONDS.observe(duration)
         span.set_attribute("duration_ms", int(duration * 1000))
-        span.set_attribute("total_results", len(docs))
+        span.set_attribute("total_results", numDocs)
 
-    total = len(docs)
+    total = numDocs
 
     # Slice to requested page.
     start = (page - 1) * page_size
     end = start + page_size
-    page_docs = docs[start:end]
+
+    if numDocs > 0:
+        page_docs = docs[start:end]
+    else:
+        page_docs = []
 
     summaries = [VideoSummary.model_validate(d) for d in page_docs]
 

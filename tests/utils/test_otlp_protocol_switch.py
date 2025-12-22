@@ -22,7 +22,7 @@ def test_otlp_protocol_switch(monkeypatch, proto):
     monkeypatch.setattr(cfg.settings, "OTEL_TRACES_ENABLED", True, raising=False)
 
     # Reset observability internal flag
-    obs._otel_instrumented = False  # type: ignore[attr-defined]
+    #obs._otel_instrumented = False  # type: ignore[attr-defined]
 
     app = FastAPI()
 
