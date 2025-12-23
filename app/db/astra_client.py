@@ -4,7 +4,10 @@
 # wrapper that relies on the new `DataAPIClient` + `AsyncDatabase` classes.
 
 import logging
+#from astrapy import DataAPIClient, AsyncCollection  # type: ignore  # noqa: F401,F811
+from astrapy import DataAPIClient, AsyncCollection
 from typing import Optional
+# astrapy v2 is available – define wrapper using actual client
 
 # Optional imports for more granular connection error handling.  These are
 # only used for *type checking* in the `except` clause; failure to import is
@@ -20,84 +23,30 @@ try:
 except ModuleNotFoundError:  # pragma: no cover – indirect dep may be absent
     HttpcoreConnectError = None  # type: ignore
 
-try:
-    # astrapy v<2 – legacy import path
-    from astrapy.db import AstraDB, AstraDBCollection  # type: ignore
+class _AstraDBV2Wrapper:  # noqa: D401
+    """Compatibility shim for astrapy v2."""
 
-except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
-    try:
-        # Try new astrapy v2 names
-        from astrapy import DataAPIClient, AsyncCollection  # type: ignore  # noqa: F401,F811
-    except ModuleNotFoundError:  # pragma: no cover - astrapy not installed at all
-        # Provide minimal stubs so that unit tests can run without the library.
-        DataAPIClient = None  # type: ignore
+    def __init__(self, *, api_endpoint: str, token: str, namespace: str):
+        client = DataAPIClient(token=token)
+        self._db = client.get_async_database(
+            api_endpoint,
+            keyspace=namespace,
+        )
 
-        class _StubCollection:  # noqa: D401
+    def collection(self, table_name: str):  # type: ignore
+        return self._db.get_collection(table_name)
 
-            async def find_one(self, *args, **kwargs):
-                return None
+    async def create_collection(self, name: str, **kwargs):  # noqa: D401
+        """Proxy to the underlying AsyncDatabase.create_collection."""
+        return await self._db.create_collection(name, **kwargs)
 
-            async def insert_one(self, *args, **kwargs):
-                return {}
-
-            async def update_one(self, *args, **kwargs):
-                return {}
-
-            # Added methods to better emulate async collection behaviour in CI
-            async def find(self, *args, **kwargs):  # type: ignore[override]
-                """Return an empty list as a pseudo-cursor."""
-                return []
-
-            async def count_documents(self, *args, **kwargs):  # noqa: D401
-                return 0
-
-            # Provide a minimal cursor-like wrapper with to_list for callers that expect it
-            async def to_list(self, *args, **kwargs):  # noqa: D401
-                return []
-
-        class _AstraDBStub:  # noqa: D401
-            def __init__(self, *args, **kwargs):
-                pass
-
-            def collection(self, *args, **kwargs):
-                return _StubCollection()
-
-            async def create_collection(self, *args, **kwargs):  # noqa: D401
-                """No-op stub for create_collection used in unit tests."""
-                return {}
-
-        AstraDB = _AstraDBStub  # type: ignore
-        AstraDBCollection = _StubCollection  # type: ignore
-
-    else:
-        # astrapy v2 is available – define wrapper using actual client
-        from astrapy import DataAPIClient, AsyncCollection  # type: ignore  # noqa: F401,F811
-
-        class _AstraDBV2Wrapper:  # noqa: D401
-            """Compatibility shim for astrapy v2."""
-
-            def __init__(self, *, api_endpoint: str, token: str, namespace: str):
-                client = DataAPIClient(token=token)
-                self._db = client.get_async_database(
-                    api_endpoint,
-                    keyspace=namespace,
-                )
-
-            def collection(self, table_name: str):  # type: ignore
-                return self._db.get_collection(table_name)
-
-            async def create_collection(self, name: str, **kwargs):  # noqa: D401
-                """Proxy to the underlying AsyncDatabase.create_collection."""
-                return await self._db.create_collection(name, **kwargs)
-
-        AstraDB = _AstraDBV2Wrapper  # type: ignore
-        AstraDBCollection = AsyncCollection  # type: ignore
+AstraDB = _AstraDBV2Wrapper  # type: ignore
+AstraDBCollection = AsyncCollection  # type: ignore
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 db_instance: Optional[AstraDB] = None
-
 
 async def init_astra_db():
     global db_instance
@@ -178,6 +127,6 @@ async def get_astra_db() -> AstraDB:
     return db_instance
 
 
-async def get_table(table_name: str) -> AstraDBCollection:
+async def get_table(table_name: str) -> AsyncCollection:
     db = await get_astra_db()
     return db.collection(table_name)

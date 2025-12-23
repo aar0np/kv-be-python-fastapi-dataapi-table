@@ -32,11 +32,28 @@ if "astrapy" not in sys.modules:  # pragma: no cover
 
         def collection(self, *args, **kwargs):  # noqa: D401
             return _StubCollection()
+        
+        def get_collection(self, *args, **kwargs):  # noqa: D401
+            return _StubCollection()
+        
+        async def create_collection(self, *args, **kwargs):  # noqa: D401
+            return _StubCollection()
+
+    class _StubDataAPIClient:  # noqa: D401
+        def __init__(self, *args, **kwargs):
+            pass
+        
+        def get_async_database(self, *args, **kwargs):  # noqa: D401
+            return _StubDB()
 
     db_stub.AstraDB = _StubDB  # type: ignore[attr-defined]
     db_stub.AstraDBCollection = _StubCollection  # type: ignore[attr-defined]
 
+    # Add v2 API classes to main astrapy module
+    astrapy_stub.DataAPIClient = _StubDataAPIClient  # type: ignore[attr-defined]
+    astrapy_stub.AsyncCollection = _StubCollection  # type: ignore[attr-defined]
     astrapy_stub.db = db_stub  # type: ignore[attr-defined]
+    
     sys.modules["astrapy"] = astrapy_stub
     sys.modules["astrapy.db"] = db_stub
 

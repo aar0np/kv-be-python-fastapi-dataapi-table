@@ -13,7 +13,7 @@ uvicorn = {extras = ["standard"], version = ">=0.34.2"}
 pydantic-settings = ">=2.9.1"
 python-jose = {extras = ["cryptography"], version = ">=3.5.0"}
 passlib = {extras = ["bcrypt"], version = ">=1.7.4"}
-astrapy = ">=2.0.1"
+astrapy = ">=2.1.0"
 cassandra-driver = ">=3.29.2"
 requests = ">=2.31.0"
 
