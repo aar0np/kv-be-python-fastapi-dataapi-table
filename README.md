@@ -9,7 +9,7 @@ Required Actions: Collaborators who interacted with this repository between Janu
 At DataStax, we remain committed to your security and to transparency within the open-source community.
 
 Impacted Repositories:
- - github.com/KillrVideo/killrvideo-2025-refresh
+ - github.com/KillrVideo/killrvideo-react-frontend
  - github.com/KillrVideo/kv-be-python-fastapi-dataapi-table
  - github.com/KillrVideo/kv-dataloader-csharp
 
