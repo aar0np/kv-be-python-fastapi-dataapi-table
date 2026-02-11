@@ -40,11 +40,11 @@ _Note: You may also want to consider additional tools for managing multiple Pyth
 6. [Get Related Videos](#6-get-related-videos)
 7. [Add KillrVideo frontend](#7-add-killrvideo-frontend)
 
-### 1. Create your Astra DB Database
+## 1. Create your Astra DB Database
 
 You can skip to step 1b if you already have an Astra DB database.
 
-#### 1a. Create Astra DB account
+### 1a. Create Astra DB account
 
 If you do not have an account yet, register and sign in to Astra DB at [astra.datastax.com](https://astra.datastax.com). This is FREE and NO CREDIT CARD is required. You can use your `GitHub` or `Google` accounts, or you can register with an email.
 
@@ -57,19 +57,19 @@ Follow this [guide](https://docs.datastax.com/en/astra-db-serverless/databases/c
  - Select a "free" region close to where you are located.
  - Click "Create Database."
 
-#### 1b. Obtain your Astra DB credentials
+### 1b. Obtain your Astra DB credentials
 
  - At the next screen, be sure to click the **"Generate Token"** button, copy your new token, and paste it somewhere safe (for now).
  - Once the database is created, you will also need to copy the `API_ENDPOINT` value from the very top of the screen.
  - From the "three dots" menu on the right side of the screen (by "Region"), select "Download SCB" and save the file locally.
  
-#### 1c. Create your Astra DB keyspace
+### 1c. Create your Astra DB keyspace
 
 From the Data Explorer tab:
   - Click on the "Keyspace" menu.
   - Select "Create keyspace" and name it `killrvideo`.
 
-### 2. Create your schema
+## 2. Create your schema
 
 From the database overview, click on the "CQL console" button (top, upper-right). This will open a new tab in your browser.
 
@@ -86,7 +86,6 @@ Copy the following CQL statement into the CQL console:
    preview_image_location text,​
    tags set<text>,​
    content_features vector<float, 384>,​
-
    userid uuid,​
    content_rating text,​
    category text,​
@@ -103,7 +102,7 @@ USING 'StorageAttachedIndex'
 WITH OPTIONS = { 'similarity_function': 'cosine' };
 ```
 
-### 3. Generage Embeddings and Load Data
+## 3. Generage Embeddings and Load Data
 
 To load data into Astra DB, we will need to clone a different repository. Make sure this gets cloned into a separate director (from the `kv-be-python-fastapi-dataapi-table` directory):
 
@@ -118,6 +117,11 @@ Set your Astra DB token and the path to your (downloaded) SCB as environment var
 |----------|-------------|
 | `ASTRA_SCB_PATH` | Path to your Astra DB Secure Connect Bundle. |
 | `ASTRA_DB_APPLICATION_TOKEN` | Token created in the Astra UI. |
+
+```bash
+ export ASTRA_DB_APPLICATION_TOKEN=AstraCS:NOTREALuApjRa:0a5f10DefinitelyNotReal04ec​
+ export ASTRA_SCB_PATH=~/Downloads/secure-connect-aaronsdb.zip
+```
 
 Next, install the dependencies:
 
@@ -148,7 +152,7 @@ If that succeeds, you should see something similar to the following:
 ============================================================
 ```
 
-### 4. Connect to Astra DB
+## 4. Connect to Astra DB
 
 For these next exercise steps, be sure to `cd` back into this project's (`kv-be-python-fastapi-dataapi-table`) directiory.
 
@@ -176,7 +180,7 @@ cp .env.example .env
 | `ASTRA_DB_APPLICATION_TOKEN` | Token created in the Astra UI. |
 | `ASTRA_DB_KEYSPACE` | `killrvideo` |
 
-#### 4a. astra_client.py - class _AstraDBV2Wrapper - init
+### 4a. astra_client.py - class _AstraDBV2Wrapper - init
 
  - In your IDE, open `app/db/astra_client.py`.
  - Look for this line in the _AstraDBV2Wrapper class' `__init__` method:
@@ -195,7 +199,7 @@ After that, add the following code to initialize the Astra DB client to the `_db
     )
 ```
 
-#### 4b. astra_client.py - init_astra_db
+### 4b. astra_client.py - init_astra_db
 
  - Look for this line in the `init_astra_db` method:
 
@@ -213,7 +217,7 @@ After that line, add the following code to define`db_instance` and create a sess
     )
 ```
 
-#### 4c. astra_client.py - get_astra_db
+### 4c. astra_client.py - get_astra_db
 
  - Look for this line in the `init_astra_db` method:
 
@@ -230,7 +234,7 @@ Start by checking to see if `db_instance` is defined. If not, call `init_astra_d
     return db_instance
 ```
 
-#### Testing for 4a, 4b, and 4c
+### Testing for 4a, 4b, and 4c
 
 To test, run the application:
 
@@ -257,9 +261,9 @@ INFO:     Application startup complete.
 
 Press [CTRL+C] to stop the application.
 
-### 5. Query videos from Astra DB
+## 5. Query videos from Astra DB
 
-#### 5a. video_service.py - get_video_by_id
+### 5a. video_service.py - get_video_by_id
 
  - In your IDE, open `app/services/video_service.py`.
  - Look for this line:
@@ -277,7 +281,7 @@ For this method, we will need to:
     doc = await db_table.find_one(filter={"videoid": str(video_id)})
 ```
 
-#### 5b. video_service.py - list_videos_with_query
+### 5b. video_service.py - list_videos_with_query
 
 This method is used by several of our video GET endpoints.
 
@@ -297,7 +301,7 @@ Here, we will need to:
     )
 ```
 
-#### Testing for 5a and 5b
+### Testing for 5a and 5b
 
 To test 5a and 5b, run the application:
 
@@ -325,7 +329,7 @@ This should return a result similar to this:
 {"data":[{"videoId":"86e1763b-6482-4014-9f7f-5028415d8e95","title":"Build AI-Powered Apps Faster with Langflow","thumbnailUrl":"https://i.ytimg.com/vi/L7V_woT8mbQ/maxresdefault.jpg","userId":"4a626541-39ca-4407-802e-08a82fa27f5f","submittedAt":"2025-08-28T05:04:35Z","content_rating":"G","category":"Education","views":0,"averageRating":null},{"videoId":"b2f64758-46dd-4976-8099-3d51ed6c82fc","title":"MCP for Developers: Visual AI with MCP, Langflow & IBM Tools","thumbnailUrl":"https://i.ytimg.com/vi/x76QZRuC__8/maxresdefault.jpg","userId":"ffd032c3-4d2b-4385-92e4-5bb6b3bfb5da","submittedAt":"2025-08-21T05:01:57Z","content_rating":"G","category":"Education","views":0,"averageRating":null},{"videoId":"8926e6d1-c09d-4f96-92a7-415b5a887233","title":"Build Real-Time GenAI Product Recs that Boost Cart Size","thumbnailUrl":"https://i.ytimg.com/vi/jwGAeqeORnM/maxresdefault.jpg","userId":"dd919cc2-cb00-4df2-8a23-4aee419acea7","submittedAt":"2025-07-23T04:52:22Z","content_rating":"G","category":"Education","views":0,"averageRating":null}],"pagination":{"currentPage":1,"pageSize":10,"totalItems":3,"totalPages":1}}
 ```
 
-### 6. Get Related Videos
+## 6. Get Related Videos
 
  - In your IDE, open the file `app/services/recommendation_service.py`.
  - Look for this line in the `get_related_videos` method:
@@ -352,7 +356,7 @@ Here we will need to:
     )
 ```
 
-#### Testing for 6
+### Testing for 6
 
 To test 6, run the application:
 
@@ -372,7 +376,7 @@ You should see a response like this:
 [{"videoId":"6a7aec3d-453b-4044-a565-cc6d4aaf44a8","title":"Learn how to build an e-Commerce App!","thumbnailUrl":"https://i.ytimg.com/vi/8KmSN3KEspE/maxresdefault.jpg","score":0.58},{"videoId":"5a2735b5-4f67-44b0-a404-aa208a91f5ac","title":"Build an eCommerce Website with Spring Boot and a NoSQL DB","thumbnailUrl":"https://i.ytimg.com/vi/P_km9yKgiqA/maxresdefault.jpg","score":0.7},{"videoId":"86c2c337-31f2-4621-84cf-55fabccb17df","title":"Build an eCommerce Website with Spring Boot and a NoSQL DB","thumbnailUrl":"https://i.ytimg.com/vi/nzQzLtIJINk/maxresdefault.jpg","score":0.95},{"videoId":"19eebc24-6bbe-49f7-a08d-93697974e1d2","title":"Learn how to build an e-Commerce App!","thumbnailUrl":"https://i.ytimg.com/vi/sGBFNDvk0pA/maxresdefault.jpg","score":0.59}]
 ```
 
-### 7. Add KillrVideo frontend
+## 7. Add KillrVideo frontend
 
  - Clone the web frontend repository:
 
