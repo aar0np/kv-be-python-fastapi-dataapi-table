@@ -313,12 +313,11 @@ async def get_video_by_id(
     if db_table is None:
         db_table = await get_table(VIDEOS_TABLE_NAME)
 
-    # Ensure we always query the database using the canonical string
-    # representation for UUIDs. This avoids mismatches between documents
-    # inserted with string values (after JSON-serialisation) and look-ups
-    # performed with ``uuid.UUID`` instances, which can lead to false
-    # negatives and unexpected 404 responses on the API layer.
-    doc = await db_table.find_one(filter={"videoid": _uuid_for_db(video_id, db_table)})
+    # WORKSHOP EXCERCISE 5a
+    # Convert UUID to string, "await" at call to `find_one` with the filter on videoid, set result to doc.
+
+
+
     if doc is None:
         return None
 
@@ -507,9 +506,9 @@ async def list_videos_with_query(
         span.set_attribute("page", page)
         span.set_attribute("page_size", page_size)
 
-        cursor = db_table.find(
-            filter=query_filter, skip=skip, limit=page_size, sort=sort_options
-        )
+        # WORKSHOP EXCERCISE #5b
+
+
 
         docs: List[Dict[str, Any]] = []
         if hasattr(cursor, "to_list"):

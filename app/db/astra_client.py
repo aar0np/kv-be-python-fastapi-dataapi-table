@@ -76,11 +76,11 @@ except ModuleNotFoundError:  # pragma: no cover  — astrapy.db not found
             """Compatibility shim for astrapy v2."""
 
             def __init__(self, *, api_endpoint: str, token: str, namespace: str):
-                client = DataAPIClient(token=token)
-                self._db = client.get_async_database(
-                    api_endpoint,
-                    keyspace=namespace,
-                )
+                # WORKSHOP EXERCISE #4a
+                # Define client locally from DataAPIClient, and set the _db variable to
+                # the result of client's get_async_database method.
+
+
 
             def collection(self, table_name: str):  # type: ignore
                 return self._db.get_collection(table_name)
@@ -120,24 +120,12 @@ async def init_astra_db():
         logger.info(
             f"Initializing AstraDB client for keyspace: {settings.ASTRA_DB_KEYSPACE} at {settings.ASTRA_DB_API_ENDPOINT[:30]}..."
         )  # Log only part of endpoint
-        # Extra debug information to help diagnose connectivity problems. The token
-        # is intentionally truncated to avoid leaking secrets in logs.
-        logger.debug(
-            "AstraDB connection settings – endpoint=%s | keyspace=%s | token_prefix=%s…",
-            settings.ASTRA_DB_API_ENDPOINT,
-            settings.ASTRA_DB_KEYSPACE,
-            settings.ASTRA_DB_APPLICATION_TOKEN[:8],
-        )
-        # The concrete class of `AstraDB` depends on the import section above
-        # (legacy vs. v2).  Both variants share the same constructor signature
-        # thanks to the wrapper defined for v2.
-        db_instance = AstraDB(
-            api_endpoint=settings.ASTRA_DB_API_ENDPOINT,
-            token=settings.ASTRA_DB_APPLICATION_TOKEN,
-            namespace=settings.ASTRA_DB_KEYSPACE,
-        )
-        # You might want to add a simple check to confirm connection, e.g., listing collections or a specific health check if available
-        # For now, we assume initialization is successful if no exceptions are raised.
+
+        # WORKSHOP EXERCISE #4b
+        # build db_instance from AstraDB constructor here
+
+
+
         logger.info("AstraDB client initialized successfully.")
     except Exception as e:
         # Handle connection-level failures with a cleaner log message to avoid
@@ -168,17 +156,10 @@ async def init_astra_db():
 
 async def get_astra_db() -> AstraDB:
     global db_instance
-    if db_instance is None:
-        logger.info("AstraDB instance not found, attempting to initialize...")
-        await init_astra_db()  # This will raise an error if init fails
-        if (
-            db_instance is None
-        ):  # Should not happen if init_astra_db doesn't raise, but defensive
-            logger.error(
-                "AstraDB initialization failed and did not raise an error, which is unexpected."
-            )
-            raise RuntimeError("AstraDB could not be initialized.")
-    return db_instance
+
+    # WORKSHOP EXERCISE #4c
+    # check for db_instance, call inti_astra_db() if needed, return db_instance
+
 
 
 async def get_table(table_name: str) -> AstraDBCollection:

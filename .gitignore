@@ -18,3 +18,4 @@ certs/
 
 .vscode/
 vars
+.python-version
