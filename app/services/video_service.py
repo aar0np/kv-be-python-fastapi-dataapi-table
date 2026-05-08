@@ -7,6 +7,7 @@ updates, listing, etc.) will be added incrementally as the epic progresses.
 
 from __future__ import annotations
 
+from bdb import effective
 import re
 from datetime import datetime, timezone, timedelta
 import asyncio
@@ -556,6 +557,25 @@ async def list_latest_videos(
         source_table_name=VIDEOS_TABLE_NAME,
     )
 
+async def get_recommended_videos(
+    query_vector: Optional[List[float]],
+    page: int,
+    page_size: int,
+    db_table: Optional[AstraDBCollection] = None,
+) -> Tuple[List[VideoSummary], int]:
+    
+    if query_vector is None:
+        return [], 0
+
+    return await list_videos_with_query(
+        {}, 
+        page, 
+        page_size=page_size,
+        sort_options={"content_features": query_vector},
+        db_table=db_table, 
+        source_table_name=VIDEOS_TABLE_NAME
+    )
+
 
 async def list_videos_by_tag(
     tag: str,
@@ -563,6 +583,7 @@ async def list_videos_by_tag(
     page_size: int,
     db_table: Optional[AstraDBCollection] = None,
 ) -> Tuple[List[VideoSummary], int]:
+
     query_filter = {
         "tags": {"$in": [tag]},
     }

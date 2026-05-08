@@ -363,9 +363,6 @@ async def get_related_videos_for_video(
     ] = 5,
 ):
     """Return a list of videos related to the given video.
-
-    The underlying implementation is currently stubbed out and will return the
-    latest videos (excluding the source video) with a random relevance score.
     """
 
     related_items = await recommendation_service.get_related_videos(

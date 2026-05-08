@@ -16,13 +16,6 @@ from app.models.user import User
 async def get_related_videos(
     video_id: VideoID, limit: int = 10
 ) -> List[RecommendationItem]:
-    """Return a stubbed *related videos* list.
-
-    In a future iteration this will call into a real recommendation engine that
-    analyses the content of the referenced video to find similar items. For the
-    moment we simply return the latest videos (excluding the reference video)
-    and assign each a random relevance score.
-    """
 
     from opentelemetry import trace
     import time
@@ -42,18 +35,28 @@ async def get_related_videos(
         if target_video is None:
             return []
 
-        latest_summaries, _total = await video_service.list_latest_videos(
-            page=1, page_size=limit + 5
+        latest_summaries, _total = await video_service.get_recommended_videos(
+            query_vector=target_video.content_features, page=1, page_size=limit + 5
         )
 
         related_items: List[RecommendationItem] = []
+        unique_video_names: List[str] = []
 
         for summary in latest_summaries:
             if summary.videoId == video_id:
                 # Skip the source video itself
                 continue
+
+            if summary.title in unique_video_names:
+                # Skip if we've already added this video to the list
+                # ...sometimes we get duplicate rows
+                continue
+            
             if len(related_items) >= limit:
                 break
+
+            unique_video_names.append(summary.title)
+
             related_items.append(
                 RecommendationItem(
                     videoId=summary.videoId,
